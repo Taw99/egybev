@@ -1,9 +1,9 @@
-const CACHE_NAME = 'egybev-v1';
+const CACHE_NAME = 'egybev-v3';
 const ASSETS = [
   './',
   './index.html',
   './manifest.json',
-  'https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap',
+  'https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap',
   'https://cdn.tailwindcss.com',
   'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js',
   'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js',
@@ -11,8 +11,9 @@ const ASSETS = [
   'https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js'
 ];
 
-// تثبيت الـ Service Worker وتخزين الملفات
+// Install and cache assets
 self.addEventListener('install', (event) => {
+  self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       return cache.addAll(ASSETS);
@@ -20,11 +21,29 @@ self.addEventListener('install', (event) => {
   );
 });
 
-// استرجاع الملفات من الكاش عند انقطاع الإنترنت
-self.addEventListener('fetch', (event) => {
-  event.respondWith(
-    caches.match(event.request).then((response) => {
-      return response || fetch(event.request);
+// Activate and clean old caches
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.keys().then((keys) => {
+      return Promise.all(
+        keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))
+      );
     })
   );
+  self.clients.claim();
+});
+
+// Network-first for HTML, cache-first for other assets
+self.addEventListener('fetch', (event) => {
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request).catch(() => caches.match(event.request))
+    );
+  } else {
+    event.respondWith(
+      caches.match(event.request).then((response) => {
+        return response || fetch(event.request);
+      })
+    );
+  }
 });

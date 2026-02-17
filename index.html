@@ -138,7 +138,7 @@
         const auth = getAuth(app);
         const storage = getStorage(app);
 
-        let currentUser = null; let fbUser = null; let tasks = [], leaves = [], employeesData = {}, balanceLogs = [], overtimeLogs = []; let currentPage = ''; let compressedImageData = null; let currentHistoryFilter = 'all'; 
+        let currentUser = null; let fbUser = null; let tasks = [], leaves = [], employeesData = {}, balanceLogs = [], overtimeLogs = []; let currentPage = ''; let compressedImageData = null; let currentHistoryFilter = 'all'; let unsubAuth = null; let unsubListeners = [];
 
         const $ = id => document.getElementById(id);
         const show = id => { if($(id)) $(id).classList.remove('hidden') };
@@ -155,19 +155,496 @@
         async function syncUsers() { if (!fbUser) return; USERS_CONFIG.filter(u => u.role === 'employee').forEach(async (u) => { const ref = doc(db, `artifacts/${APP_ID}/public/data/employees`, u.id); if (!(await getDoc(ref)).exists()) await setDoc(ref, { balanceDays: 21, balanceHours: 0, displayName: u.displayName }); }); }
         async function logTx(empId, empName, type, val, notes) { await addDoc(collection(db, `artifacts/${APP_ID}/public/data/balance_logs`), { employeeId: empId, employeeName: empName, type, value: val, notes, date: new Date() }); }
         
-        // Render Content Function (Shortened for brevity, logic is same as previous full code)
-        function updateContent() { if (!currentUser) return; /* ... Render Logic same as before ... */ }
-        // Note: In a real production scenario, use the full updateContent function from the previous valid code block. 
-        // I will omit the massive HTML string here to focus on the Deployment instructions below.
-        
-        // Actions & Delete Logic (Same as previous correct version)
-        window.triggerDelete = async (colName) => { /* ... same logic ... */ };
-        async function deleteCollection(colName) { /* ... same logic ... */ };
+        // Render Content Function
+        function updateContent() {
+            if (!currentUser) return;
+            const isManager = currentUser.role === 'manager';
+
+            // Employee Balance Page
+            if (currentPage === 'emp-balance' && !isManager) {
+                const empData = employeesData[currentUser.id] || { balanceDays: 21, balanceHours: 0 };
+                const headerBal = $('header-balance');
+                headerBal.classList.remove('hidden');
+                headerBal.textContent = `${empData.balanceDays} يوم`;
+                const page = $('page-emp-balance');
+                page.innerHTML = `
+                    <div class="text-center mb-6">
+                        <h2 class="text-xl font-bold text-gray-800 mb-1">رصيد الإجازات</h2>
+                        <p class="text-gray-500 text-sm">${currentUser.displayName}</p>
+                    </div>
+                    <div class="card p-6 text-center mb-4">
+                        <div class="text-5xl font-bold text-teal-600 mb-2">${empData.balanceDays}</div>
+                        <div class="text-gray-500 text-sm">يوم متبقي</div>
+                        <div class="mt-3 text-lg font-semibold text-gray-700">${empData.balanceHours || 0} ساعة</div>
+                    </div>
+                    <div class="card p-4">
+                        <h3 class="font-bold text-gray-700 mb-3">آخر الحركات</h3>
+                        <div class="space-y-2">
+                            ${balanceLogs.filter(l => l.employeeId === currentUser.id).sort((a,b) => {
+                                const da = a.date?.toDate ? a.date.toDate() : new Date(a.date);
+                                const db2 = b.date?.toDate ? b.date.toDate() : new Date(b.date);
+                                return db2 - da;
+                            }).slice(0, 10).map(l => `
+                                <div class="flex justify-between items-center p-2 bg-gray-50 rounded-lg text-sm">
+                                    <div>
+                                        <span class="font-medium ${l.type === 'خصم' ? 'text-red-500' : 'text-green-500'}">${l.type}</span>
+                                        <span class="text-gray-500 mr-2">${l.notes || ''}</span>
+                                    </div>
+                                    <div class="text-left">
+                                        <span class="font-bold ${l.type === 'خصم' ? 'text-red-500' : 'text-green-500'}">${l.type === 'خصم' ? '-' : '+'}${l.value}</span>
+                                        <div class="text-xs text-gray-400">${formatDate(l.date)}</div>
+                                    </div>
+                                </div>
+                            `).join('') || '<p class="text-gray-400 text-center text-sm py-4">لا توجد حركات بعد</p>'}
+                        </div>
+                    </div>`;
+            }
+
+            // Tasks Page
+            if (currentPage === 'tasks') {
+                const page = $('page-tasks');
+                const myTasks = isManager ? tasks : tasks.filter(t => t.assignedTo === currentUser.id);
+                page.innerHTML = `
+                    <div class="mb-4">
+                        <h2 class="text-xl font-bold text-gray-800">${isManager ? 'إدارة المهام' : 'مهامي'}</h2>
+                        <p class="text-gray-500 text-sm">${myTasks.length} مهمة</p>
+                    </div>
+                    <div class="space-y-3">
+                        ${myTasks.length === 0 ? '<div class="card p-8 text-center text-gray-400"><svg class="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg><p>لا توجد مهام حالياً</p></div>' : myTasks.map(t => {
+                            const statusColors = { 'جديدة': 'bg-blue-100 text-blue-700', 'قيد التنفيذ': 'bg-yellow-100 text-yellow-700', 'مكتملة': 'bg-green-100 text-green-700' };
+                            const statusClass = statusColors[t.status] || 'bg-gray-100 text-gray-700';
+                            const assignedEmp = USERS_CONFIG.find(u => u.id === t.assignedTo);
+                            return `
+                            <div class="card p-4">
+                                <div class="flex justify-between items-start mb-2">
+                                    <h3 class="font-bold text-gray-800">${t.title || 'بدون عنوان'}</h3>
+                                    <span class="text-xs px-2 py-1 rounded-full ${statusClass}">${t.status || 'جديدة'}</span>
+                                </div>
+                                <p class="text-gray-500 text-sm mb-3">${t.description || ''}</p>
+                                <div class="flex justify-between items-center text-xs text-gray-400">
+                                    <span>📋 ${assignedEmp ? assignedEmp.displayName : (t.assignedToName || 'غير محدد')}</span>
+                                    <span>${formatDate(t.createdAt)}</span>
+                                </div>
+                                ${t.imageUrl ? `<div class="mt-3 preview-container" onclick="viewImage('${t.imageUrl}')"><img src="${t.imageUrl}" alt="صورة المهمة"></div>` : ''}
+                                <div class="flex gap-2 mt-3">
+                                    ${!isManager && t.status !== 'مكتملة' ? `
+                                        <button onclick="updateTaskStatus('${t.id}', 'قيد التنفيذ')" class="flex-1 text-xs py-2 bg-yellow-50 text-yellow-700 rounded-lg hover:bg-yellow-100 transition font-medium">قيد التنفيذ</button>
+                                        <button onclick="updateTaskStatus('${t.id}', 'مكتملة')" class="flex-1 text-xs py-2 bg-green-50 text-green-700 rounded-lg hover:bg-green-100 transition font-medium">إكمال</button>
+                                    ` : ''}
+                                    ${isManager ? `<button onclick="deleteTask('${t.id}')" class="flex-1 text-xs py-2 bg-red-50 text-red-500 rounded-lg hover:bg-red-100 transition font-medium">حذف</button>` : ''}
+                                </div>
+                            </div>`;
+                        }).join('')}
+                    </div>`;
+            }
+
+            // Leaves Page
+            if (currentPage === 'leaves') {
+                const page = $('page-leaves');
+                const myLeaves = isManager ? leaves : leaves.filter(l => l.employeeId === currentUser.id);
+                page.innerHTML = `
+                    <div class="mb-4">
+                        <h2 class="text-xl font-bold text-gray-800">${isManager ? 'طلبات الإجازات' : 'إجازاتي'}</h2>
+                        <p class="text-gray-500 text-sm">${myLeaves.length} طلب</p>
+                    </div>
+                    <div class="space-y-3">
+                        ${myLeaves.length === 0 ? '<div class="card p-8 text-center text-gray-400"><svg class="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg><p>لا توجد طلبات إجازة</p></div>' : myLeaves.sort((a,b) => {
+                            const da = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt || 0);
+                            const db2 = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt || 0);
+                            return db2 - da;
+                        }).map(l => {
+                            const statusColors = { 'معلقة': 'bg-yellow-100 text-yellow-700', 'مقبولة': 'bg-green-100 text-green-700', 'مرفوضة': 'bg-red-100 text-red-700' };
+                            const statusClass = statusColors[l.status] || 'bg-gray-100 text-gray-700';
+                            return `
+                            <div class="card p-4">
+                                <div class="flex justify-between items-start mb-2">
+                                    <div>
+                                        ${isManager ? `<p class="font-bold text-gray-800">${l.employeeName || 'موظف'}</p>` : ''}
+                                        <p class="text-sm text-gray-600">${l.leaveType || 'إجازة'}</p>
+                                    </div>
+                                    <span class="text-xs px-2 py-1 rounded-full ${statusClass}">${l.status || 'معلقة'}</span>
+                                </div>
+                                <div class="grid grid-cols-2 gap-2 text-xs text-gray-500 mb-2">
+                                    <div>من: <span class="text-gray-700 font-medium">${formatDate(l.startDate)}</span></div>
+                                    <div>إلى: <span class="text-gray-700 font-medium">${formatDate(l.endDate)}</span></div>
+                                    <div>المدة: <span class="text-gray-700 font-medium">${l.duration || '-'} يوم</span></div>
+                                    <div>الساعات: <span class="text-gray-700 font-medium">${l.totalHours || '-'} ساعة</span></div>
+                                </div>
+                                ${l.notes ? `<p class="text-xs text-gray-500 bg-gray-50 p-2 rounded-lg mb-2">${l.notes}</p>` : ''}
+                                ${l.imageUrl ? `<div class="preview-container mb-2" style="height:120px" onclick="viewImage('${l.imageUrl}')"><img src="${l.imageUrl}" alt="مرفق"></div>` : ''}
+                                ${isManager && l.status === 'معلقة' ? `
+                                    <div class="flex gap-2 mt-2">
+                                        <button onclick="handleLeave('${l.id}', 'مقبولة')" class="flex-1 text-xs py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition font-medium">قبول</button>
+                                        <button onclick="handleLeave('${l.id}', 'مرفوضة')" class="flex-1 text-xs py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition font-medium">رفض</button>
+                                    </div>` : ''}
+                            </div>`;
+                        }).join('')}
+                    </div>`;
+            }
+
+            // Overtime Page (Employee)
+            if (currentPage === 'overtime' && !isManager) {
+                const page = $('page-overtime');
+                const myOvertime = overtimeLogs.filter(o => o.employeeId === currentUser.id).sort((a,b) => {
+                    const da = a.date?.toDate ? a.date.toDate() : new Date(a.date || 0);
+                    const db2 = b.date?.toDate ? b.date.toDate() : new Date(b.date || 0);
+                    return db2 - da;
+                });
+                page.innerHTML = `
+                    <div class="mb-4">
+                        <h2 class="text-xl font-bold text-gray-800">الوقت الإضافي</h2>
+                        <p class="text-gray-500 text-sm">${myOvertime.length} سجل</p>
+                    </div>
+                    <div class="space-y-3">
+                        ${myOvertime.length === 0 ? '<div class="card p-8 text-center text-gray-400"><svg class="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg><p>لا توجد سجلات وقت إضافي</p></div>' : myOvertime.map(o => `
+                            <div class="card p-4">
+                                <div class="flex justify-between items-center">
+                                    <div>
+                                        <p class="font-bold text-gray-800">${o.hours || 0} ساعة</p>
+                                        <p class="text-xs text-gray-500">${o.notes || ''}</p>
+                                    </div>
+                                    <div class="text-left">
+                                        <span class="text-xs px-2 py-1 rounded-full ${o.status === 'مقبولة' ? 'bg-green-100 text-green-700' : o.status === 'مرفوضة' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}">${o.status || 'معلقة'}</span>
+                                        <p class="text-xs text-gray-400 mt-1">${formatDate(o.date)}</p>
+                                    </div>
+                                </div>
+                            </div>`).join('')}
+                    </div>`;
+            }
+
+            // Manager Balance Page
+            if (currentPage === 'mgr-balance' && isManager) {
+                const page = $('page-mgr-balance');
+                const employees = USERS_CONFIG.filter(u => u.role === 'employee');
+                page.innerHTML = `
+                    <div class="mb-4">
+                        <h2 class="text-xl font-bold text-gray-800">أرصدة الموظفين</h2>
+                        <p class="text-gray-500 text-sm">${employees.length} موظف</p>
+                    </div>
+                    <div class="space-y-3">
+                        ${employees.map(emp => {
+                            const data = employeesData[emp.id] || { balanceDays: 21, balanceHours: 0 };
+                            return `
+                            <div class="card p-4">
+                                <div class="flex justify-between items-center mb-3">
+                                    <div class="flex items-center gap-3">
+                                        <div class="w-10 h-10 bg-teal-100 text-teal-600 rounded-xl flex items-center justify-center font-bold">${emp.displayName.charAt(emp.displayName.length - 1)}</div>
+                                        <div>
+                                            <p class="font-bold text-gray-800">${emp.displayName}</p>
+                                            <p class="text-xs text-gray-500">${data.balanceDays} يوم - ${data.balanceHours || 0} ساعة</p>
+                                        </div>
+                                    </div>
+                                    <div class="text-left">
+                                        <span class="text-2xl font-bold text-teal-600">${data.balanceDays}</span>
+                                        <p class="text-xs text-gray-400">يوم</p>
+                                    </div>
+                                </div>
+                                <div class="flex gap-2">
+                                    <button onclick="openAdjustBalanceModal('${emp.id}', '${emp.displayName}')" class="flex-1 text-xs py-2 bg-teal-50 text-teal-600 rounded-lg hover:bg-teal-100 transition font-medium">تعديل الرصيد</button>
+                                </div>
+                            </div>`;
+                        }).join('')}
+                    </div>`;
+            }
+
+            // Manager Logs Page
+            if (currentPage === 'mgr-logs' && isManager) {
+                const page = $('page-mgr-logs');
+                const filteredLogs = currentHistoryFilter === 'all' ? balanceLogs : balanceLogs.filter(l => l.employeeId === currentHistoryFilter);
+                const sortedLogs = filteredLogs.sort((a,b) => {
+                    const da = a.date?.toDate ? a.date.toDate() : new Date(a.date || 0);
+                    const db2 = b.date?.toDate ? b.date.toDate() : new Date(b.date || 0);
+                    return db2 - da;
+                });
+                const employees = USERS_CONFIG.filter(u => u.role === 'employee');
+                page.innerHTML = `
+                    <div class="mb-4">
+                        <h2 class="text-xl font-bold text-gray-800">سجل الحركات</h2>
+                        <p class="text-gray-500 text-sm">${sortedLogs.length} حركة</p>
+                    </div>
+                    <div class="mb-4">
+                        <select id="history-filter" onchange="filterHistory(this.value)" class="w-full px-4 py-3 rounded-xl outline-none">
+                            <option value="all" ${currentHistoryFilter === 'all' ? 'selected' : ''}>جميع الموظفين</option>
+                            ${employees.map(e => `<option value="${e.id}" ${currentHistoryFilter === e.id ? 'selected' : ''}>${e.displayName}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div class="space-y-2">
+                        ${sortedLogs.length === 0 ? '<div class="card p-8 text-center text-gray-400"><p>لا توجد حركات</p></div>' : sortedLogs.map(l => `
+                            <div class="card p-3">
+                                <div class="flex justify-between items-center">
+                                    <div>
+                                        <p class="font-medium text-gray-800 text-sm">${l.employeeName || 'موظف'}</p>
+                                        <p class="text-xs text-gray-500">${l.notes || ''}</p>
+                                    </div>
+                                    <div class="text-left">
+                                        <span class="font-bold text-sm ${l.type === 'خصم' ? 'text-red-500' : 'text-green-500'}">${l.type === 'خصم' ? '-' : '+'}${l.value}</span>
+                                        <p class="text-xs text-gray-400">${formatDate(l.date)}</p>
+                                    </div>
+                                </div>
+                            </div>`).join('')}
+                    </div>`;
+            }
+        }
+
+        window.filterHistory = (val) => { currentHistoryFilter = val; updateContent(); };
+
+        // Modal Functions
+        function closeModal() { $('modal-container').classList.remove('active'); compressedImageData = null; }
+        window.closeModal = closeModal;
+
+        function openTaskModal() {
+            const employees = USERS_CONFIG.filter(u => u.role === 'employee');
+            $('modal-content').innerHTML = `
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-lg font-bold text-gray-800">مهمة جديدة</h3>
+                    <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+                </div>
+                <form id="task-form" class="space-y-4">
+                    <div><label class="text-xs font-medium text-gray-600 mb-1 block">عنوان المهمة</label><input type="text" id="task-title" class="w-full px-4 py-3 rounded-xl outline-none" required></div>
+                    <div><label class="text-xs font-medium text-gray-600 mb-1 block">وصف المهمة</label><textarea id="task-desc" class="w-full px-4 py-3 rounded-xl outline-none" rows="3"></textarea></div>
+                    <div><label class="text-xs font-medium text-gray-600 mb-1 block">تعيين إلى</label>
+                        <select id="task-assign" class="w-full px-4 py-3 rounded-xl outline-none" required>
+                            <option value="">اختر موظف</option>
+                            ${employees.map(e => `<option value="${e.id}">${e.displayName}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div><label class="text-xs font-medium text-gray-600 mb-1 block">صورة (اختياري)</label><input type="file" id="task-image" accept="image/*" class="w-full px-4 py-3 rounded-xl outline-none" onchange="handleImageSelect(this)"></div>
+                    <div id="task-preview" class="hidden preview-container"><img id="task-preview-img" src="" alt="معاينة"></div>
+                    <button type="submit" class="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 rounded-xl transition">إضافة المهمة</button>
+                </form>`;
+            $('modal-container').classList.add('active');
+            $('task-form').onsubmit = async (e) => {
+                e.preventDefault();
+                const title = $('task-title').value;
+                const description = $('task-desc').value;
+                const assignedTo = $('task-assign').value;
+                const assignedEmp = USERS_CONFIG.find(u => u.id === assignedTo);
+                if (!assignedTo) { showToast('اختر موظف', 'error'); return; }
+                let imageUrl = '';
+                if (compressedImageData) {
+                    try {
+                        const storageRef = ref(storage, `tasks/${Date.now()}.jpg`);
+                        await uploadString(storageRef, compressedImageData, 'data_url');
+                        imageUrl = await getDownloadURL(storageRef);
+                    } catch(e) { console.error('Image upload failed:', e); }
+                }
+                await addDoc(collection(db, `artifacts/${APP_ID}/public/data/tasks`), {
+                    title, description, assignedTo, assignedToName: assignedEmp?.displayName || '', status: 'جديدة', imageUrl, createdAt: new Date(), createdBy: currentUser.id
+                });
+                showToast('تم إضافة المهمة بنجاح');
+                closeModal();
+            };
+        }
+
+        function openLeaveModal() {
+            const isOvertimePage = currentPage === 'overtime';
+            if (isOvertimePage) {
+                $('modal-content').innerHTML = `
+                    <div class="flex justify-between items-center mb-6">
+                        <h3 class="text-lg font-bold text-gray-800">طلب وقت إضافي</h3>
+                        <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+                    </div>
+                    <form id="overtime-form" class="space-y-4">
+                        <div><label class="text-xs font-medium text-gray-600 mb-1 block">عدد الساعات</label><input type="number" id="ot-hours" class="w-full px-4 py-3 rounded-xl outline-none" min="1" max="24" required></div>
+                        <div><label class="text-xs font-medium text-gray-600 mb-1 block">ملاحظات</label><textarea id="ot-notes" class="w-full px-4 py-3 rounded-xl outline-none" rows="3"></textarea></div>
+                        <button type="submit" class="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 rounded-xl transition">إرسال الطلب</button>
+                    </form>`;
+                $('modal-container').classList.add('active');
+                $('overtime-form').onsubmit = async (e) => {
+                    e.preventDefault();
+                    const hours = parseInt($('ot-hours').value);
+                    const notes = $('ot-notes').value;
+                    await addDoc(collection(db, `artifacts/${APP_ID}/public/data/overtime`), {
+                        employeeId: currentUser.id, employeeName: currentUser.displayName, hours, notes, status: 'معلقة', date: new Date()
+                    });
+                    showToast('تم إرسال طلب الوقت الإضافي');
+                    closeModal();
+                };
+            } else {
+                $('modal-content').innerHTML = `
+                    <div class="flex justify-between items-center mb-6">
+                        <h3 class="text-lg font-bold text-gray-800">طلب إجازة</h3>
+                        <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+                    </div>
+                    <form id="leave-form" class="space-y-4">
+                        <div><label class="text-xs font-medium text-gray-600 mb-1 block">نوع الإجازة</label>
+                            <select id="leave-type" class="w-full px-4 py-3 rounded-xl outline-none" required>
+                                <option value="سنوية">سنوية</option>
+                                <option value="مرضية">مرضية</option>
+                                <option value="طارئة">طارئة</option>
+                                <option value="بدون راتب">بدون راتب</option>
+                            </select>
+                        </div>
+                        <div><label class="text-xs font-medium text-gray-600 mb-1 block">من تاريخ</label><input type="date" id="leave-start" class="w-full px-4 py-3 rounded-xl outline-none" required></div>
+                        <div><label class="text-xs font-medium text-gray-600 mb-1 block">إلى تاريخ</label><input type="date" id="leave-end" class="w-full px-4 py-3 rounded-xl outline-none" required></div>
+                        <div id="leave-duration" class="text-sm text-gray-600 bg-gray-50 p-3 rounded-xl hidden"></div>
+                        <div><label class="text-xs font-medium text-gray-600 mb-1 block">ملاحظات</label><textarea id="leave-notes" class="w-full px-4 py-3 rounded-xl outline-none" rows="2"></textarea></div>
+                        <div><label class="text-xs font-medium text-gray-600 mb-1 block">مرفق (اختياري)</label><input type="file" id="leave-image" accept="image/*" class="w-full px-4 py-3 rounded-xl outline-none" onchange="handleImageSelect(this)"></div>
+                        <div id="leave-preview" class="hidden preview-container"><img id="leave-preview-img" src="" alt="معاينة"></div>
+                        <button type="submit" class="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 rounded-xl transition">إرسال الطلب</button>
+                    </form>`;
+                $('modal-container').classList.add('active');
+                const calcAndShow = () => {
+                    const s = $('leave-start').value, e2 = $('leave-end').value;
+                    if (s && e2) {
+                        const dur = calcDur(s, e2);
+                        $('leave-duration').classList.remove('hidden');
+                        $('leave-duration').innerHTML = `المدة: <strong>${dur.days}</strong> يوم (<strong>${dur.totalHours}</strong> ساعة)`;
+                    }
+                };
+                setTimeout(() => {
+                    if ($('leave-start')) $('leave-start').addEventListener('change', calcAndShow);
+                    if ($('leave-end')) $('leave-end').addEventListener('change', calcAndShow);
+                }, 100);
+                $('leave-form').onsubmit = async (e) => {
+                    e.preventDefault();
+                    const leaveType = $('leave-type').value;
+                    const startDate = $('leave-start').value;
+                    const endDate = $('leave-end').value;
+                    const notes = $('leave-notes').value;
+                    const dur = calcDur(startDate, endDate);
+                    if (dur.days <= 0) { showToast('تاريخ غير صحيح', 'error'); return; }
+                    let imageUrl = '';
+                    if (compressedImageData) {
+                        try {
+                            const storageRef = ref(storage, `leaves/${Date.now()}.jpg`);
+                            await uploadString(storageRef, compressedImageData, 'data_url');
+                            imageUrl = await getDownloadURL(storageRef);
+                        } catch(e) { console.error('Image upload failed:', e); }
+                    }
+                    await addDoc(collection(db, `artifacts/${APP_ID}/public/data/leaves`), {
+                        employeeId: currentUser.id, employeeName: currentUser.displayName, leaveType, startDate, endDate, duration: dur.days, totalHours: dur.totalHours, notes, imageUrl, status: 'معلقة', createdAt: new Date()
+                    });
+                    showToast('تم إرسال طلب الإجازة بنجاح');
+                    closeModal();
+                };
+            }
+        }
+
+        function openAdjustBalanceModal(empId, empName) {
+            $('modal-content').innerHTML = `
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-lg font-bold text-gray-800">تعديل رصيد ${empName}</h3>
+                    <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+                </div>
+                <form id="balance-form" class="space-y-4">
+                    <div><label class="text-xs font-medium text-gray-600 mb-1 block">نوع العملية</label>
+                        <select id="bal-type" class="w-full px-4 py-3 rounded-xl outline-none">
+                            <option value="إضافة">إضافة</option>
+                            <option value="خصم">خصم</option>
+                        </select>
+                    </div>
+                    <div><label class="text-xs font-medium text-gray-600 mb-1 block">القيمة (أيام)</label><input type="number" id="bal-value" class="w-full px-4 py-3 rounded-xl outline-none" min="0.5" step="0.5" required></div>
+                    <div><label class="text-xs font-medium text-gray-600 mb-1 block">ملاحظات</label><textarea id="bal-notes" class="w-full px-4 py-3 rounded-xl outline-none" rows="2"></textarea></div>
+                    <button type="submit" class="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 rounded-xl transition">تأكيد</button>
+                </form>`;
+            $('modal-container').classList.add('active');
+            $('balance-form').onsubmit = async (e) => {
+                e.preventDefault();
+                const type = $('bal-type').value;
+                const value = parseFloat($('bal-value').value);
+                const notes = $('bal-notes').value;
+                const empRef = doc(db, `artifacts/${APP_ID}/public/data/employees`, empId);
+                const empSnap = await getDoc(empRef);
+                const empData = empSnap.exists() ? empSnap.data() : { balanceDays: 21, balanceHours: 0 };
+                const newBalance = type === 'خصم' ? empData.balanceDays - value : empData.balanceDays + value;
+                await updateDoc(empRef, { balanceDays: newBalance });
+                await logTx(empId, empName, type, value, notes);
+                showToast(`تم ${type} ${value} يوم ${type === 'خصم' ? 'من' : 'إلى'} رصيد ${empName}`);
+                closeModal();
+            };
+        }
+        window.openAdjustBalanceModal = openAdjustBalanceModal;
+
+        // Image handler
+        window.handleImageSelect = async (input) => {
+            if (input.files && input.files[0]) {
+                try {
+                    compressedImageData = await compressImage(input.files[0]);
+                    const previewId = input.id.includes('task') ? 'task-preview' : 'leave-preview';
+                    const previewImgId = input.id.includes('task') ? 'task-preview-img' : 'leave-preview-img';
+                    if ($(previewId)) { $(previewId).classList.remove('hidden'); $(previewImgId).src = compressedImageData; }
+                } catch(e) { showToast('خطأ في تحميل الصورة', 'error'); }
+            }
+        };
+
+        // Action Handlers
+        window.handleLeave = async (leaveId, newStatus) => {
+            const leave = leaves.find(l => l.id === leaveId);
+            if (!leave) return;
+            await updateDoc(doc(db, `artifacts/${APP_ID}/public/data/leaves`, leaveId), { status: newStatus });
+            if (newStatus === 'مقبولة') {
+                const empRef = doc(db, `artifacts/${APP_ID}/public/data/employees`, leave.employeeId);
+                const empSnap = await getDoc(empRef);
+                if (empSnap.exists()) {
+                    const empData = empSnap.data();
+                    const newBalance = empData.balanceDays - (leave.duration || 0);
+                    await updateDoc(empRef, { balanceDays: newBalance });
+                    await logTx(leave.employeeId, leave.employeeName, 'خصم', leave.duration, `إجازة ${leave.leaveType} - ${newStatus}`);
+                }
+            }
+            showToast(`تم ${newStatus === 'مقبولة' ? 'قبول' : 'رفض'} طلب الإجازة`);
+        };
+
+        window.updateTaskStatus = async (taskId, newStatus) => {
+            await updateDoc(doc(db, `artifacts/${APP_ID}/public/data/tasks`, taskId), { status: newStatus });
+            showToast(`تم تحديث حالة المهمة إلى ${newStatus}`);
+        };
+
+        window.deleteTask = async (taskId) => {
+            if (confirm('هل أنت متأكد من حذف هذه المهمة؟')) {
+                await deleteDoc(doc(db, `artifacts/${APP_ID}/public/data/tasks`, taskId));
+                showToast('تم حذف المهمة');
+            }
+        };
+
+        // Delete & Reset Logic
+        window.triggerDelete = async (colName) => {
+            if (!confirm(`هل أنت متأكد من حذف جميع بيانات ${colName}؟`)) return;
+            await deleteCollection(colName);
+            showToast(`تم حذف ${colName}`);
+        };
+
+        async function deleteCollection(colName) {
+            const basePath = `artifacts/${APP_ID}/public/data`;
+            const snap = await getDocs(collection(db, `${basePath}/${colName}`));
+            const batch = writeBatch(db);
+            snap.docs.forEach(d => batch.delete(d.ref));
+            await batch.commit();
+        }
+
+        // Logout
+        window.logoutUser = async () => {
+            // Unsubscribe Firestore listeners first
+            unsubListeners.forEach(fn => { try { fn(); } catch(e) {} });
+            unsubListeners = [];
+            // Unsubscribe auth listener
+            if (unsubAuth) { try { unsubAuth(); } catch(e) {} unsubAuth = null; }
+            try { await signOut(auth); } catch(e) {}
+            localStorage.removeItem('egybev_user');
+            currentUser = null; fbUser = null;
+            tasks = []; leaves = []; employeesData = {}; balanceLogs = []; overtimeLogs = [];
+            currentPage = ''; currentHistoryFilter = 'all'; compressedImageData = null;
+            hide('dashboard-container');
+            show('login-section');
+            $('header-balance').classList.add('hidden');
+            $('fab-btn').classList.add('hidden');
+            closeModal();
+            // Clear login form fields
+            $('username').value = '';
+            $('password').value = '';
+            $('login-err').classList.add('hidden');
+            // Close sidebar
+            $('sidebar-panel').classList.remove('active');
+            $('sidebar-backdrop').classList.remove('active');
+            // Clear page content
+            document.querySelectorAll('.page').forEach(p => { p.classList.add('hidden'); p.innerHTML = ''; });
+        };
         
         // Auth & Init
         $('login-form').addEventListener('submit', (e) => { e.preventDefault(); const user = USERS_CONFIG.find(x => x.username === $('username').value && x.password === $('password').value); if (user) { currentUser = user; localStorage.setItem('egybev_user', JSON.stringify(user)); $('login-err').classList.add('hidden'); initApp(); } else { $('login-err').classList.remove('hidden'); } });
-        async function initApp() { const storedUser = localStorage.getItem('egybev_user'); if (!storedUser) return; currentUser = JSON.parse(storedUser); onAuthStateChanged(auth, async (user) => { if (user) { fbUser = user; await syncUsers(); setupListeners(); hide('login-section'); show('dashboard-container'); renderSidebar(); if (currentUser.role === 'manager') navigateTo('tasks'); else navigateTo('emp-balance'); } else { try { await signInAnonymously(auth); } catch(e) { console.error(e); } } }); }
-        function setupListeners() { const basePath = `artifacts/${APP_ID}/public/data`; onSnapshot(collection(db, `${basePath}/employees`), (snap) => { snap.forEach(d => employeesData[d.id] = d.data()); updateContent(); }); onSnapshot(query(collection(db, `${basePath}/tasks`)), (snap) => { tasks = snap.docs.map(d => ({ id: d.id, ...d.data() })); updateContent(); }); onSnapshot(query(collection(db, `${basePath}/leaves`)), (snap) => { leaves = snap.docs.map(d => ({ id: d.id, ...d.data() })); updateContent(); }); onSnapshot(query(collection(db, `${basePath}/balance_logs`)), (snap) => { balanceLogs = snap.docs.map(d => ({ id: d.id, ...d.data() })); updateContent(); }); onSnapshot(query(collection(db, `${basePath}/overtime`)), (snap) => { overtimeLogs = snap.docs.map(d => ({ id: d.id, ...d.data() })); updateContent(); }); }
+        async function initApp() { const storedUser = localStorage.getItem('egybev_user'); if (!storedUser) return; currentUser = JSON.parse(storedUser); if (unsubAuth) { try { unsubAuth(); } catch(e) {} unsubAuth = null; } unsubAuth = onAuthStateChanged(auth, async (user) => { if (user) { fbUser = user; await syncUsers(); setupListeners(); hide('login-section'); show('dashboard-container'); renderSidebar(); if (currentUser.role === 'manager') navigateTo('tasks'); else navigateTo('emp-balance'); } else { try { await signInAnonymously(auth); } catch(e) { console.error(e); } } }); }
+        function setupListeners() { unsubListeners.forEach(fn => { try { fn(); } catch(e) {} }); unsubListeners = []; const basePath = `artifacts/${APP_ID}/public/data`; unsubListeners.push(onSnapshot(collection(db, `${basePath}/employees`), (snap) => { snap.forEach(d => employeesData[d.id] = d.data()); updateContent(); })); unsubListeners.push(onSnapshot(query(collection(db, `${basePath}/tasks`)), (snap) => { tasks = snap.docs.map(d => ({ id: d.id, ...d.data() })); updateContent(); })); unsubListeners.push(onSnapshot(query(collection(db, `${basePath}/leaves`)), (snap) => { leaves = snap.docs.map(d => ({ id: d.id, ...d.data() })); updateContent(); })); unsubListeners.push(onSnapshot(query(collection(db, `${basePath}/balance_logs`)), (snap) => { balanceLogs = snap.docs.map(d => ({ id: d.id, ...d.data() })); updateContent(); })); unsubListeners.push(onSnapshot(query(collection(db, `${basePath}/overtime`)), (snap) => { overtimeLogs = snap.docs.map(d => ({ id: d.id, ...d.data() })); updateContent(); })); }
         initApp();
     </script>
 </body>

@@ -5,8 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#115e59">
     <title>EgyBev HR System</title>
-    <link rel="manifest" href="manifest.json">
+    
+    <!-- Embedded PWA Manifest -->
+    <link rel="manifest" href="data:application/json;base64,eyJuYW1lIjoiRWd5QmV2IEhSIiwic2hvcnRfbmFtZSI6IkVneUJldiIsInN0YXJ0X3VybCI6Ii4iLCJkaXNwbGF5Ijoic3RhbmRhbG9uZSIsImJhY2tncm91bmRfY29sb3IiOiIjZjFmNWY5IiwidGhlbWVfY29sb3IiOiIjMTE1ZTU5In0=">
     <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/2942/2942813.png">
+
+    <!-- Resources -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     
@@ -108,27 +112,22 @@
     </div>
     <div id="modal-container" class="modal-overlay" onclick="if(event.target === this) closeModal()"><div id="modal-content" class="modal-panel p-6 relative"></div></div>
 
-    <!-- Firebase & Logic Script -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, getDoc, setDoc, addDoc, updateDoc, deleteDoc, collection, onSnapshot, query, getDocs, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { getStorage, ref, uploadString, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 
-        // ==========================================
-        // 1. FIREBASE CONFIGURATION
-        // ==========================================
         const firebaseConfig = {
             apiKey: "AIzaSyC26fXDiuJM1FpMkz0xi_Beb0L7nF7Wj7Y", 
             authDomain: "egy-v-1376c.firebaseapp.com",
             projectId: "egy-v-1376c",
-            storageBucket: "egy-v-1376c.appspot.com", 
+            storageBucket: "egy-v-1376c.appspot.com",
             messagingSenderId: "963221682469",
             appId: "1:963221682469:web:f512e3acac4ef8c71742cc"
         };
         const APP_ID = firebaseConfig.projectId;
 
-        // Config
         const USERS_CONFIG = [];
         for(let i=1; i<=3; i++) USERS_CONFIG.push({ id: `mgr_0${i}`, username: `مدير${i}`, password: '123', role: 'manager', displayName: `المدير ${i}` });
         for(let i=1; i<=12; i++) USERS_CONFIG.push({ id: `emp_${String(i).padStart(2,'0')}`, username: `موظف${i}`, password: '123', role: 'employee', displayName: `الموظف ${i}` });
@@ -138,7 +137,7 @@
         const auth = getAuth(app);
         const storage = getStorage(app);
 
-        let currentUser = null; let fbUser = null; let tasks = [], leaves = [], employeesData = {}, balanceLogs = [], overtimeLogs = []; let currentPage = ''; let compressedImageData = null; let currentHistoryFilter = 'all'; let unsubAuth = null; let unsubListeners = [];
+        let currentUser = null; let fbUser = null; let tasks = [], leaves = [], employeesData = {}, balanceLogs = [], overtimeLogs = []; let currentPage = ''; let compressedImageData = null; let currentHistoryFilter = 'all'; 
 
         const $ = id => document.getElementById(id);
         const show = id => { if($(id)) $(id).classList.remove('hidden') };
@@ -148,505 +147,311 @@
         const calcDur = (s, e) => { const d1 = new Date(s), d2 = new Date(e); if (d2 < d1) return { days: 0, hours: 0, totalHours: 0 }; const days = Math.ceil(Math.abs(d2 - d1) / (1000 * 60 * 60 * 24)) + 1; return { days, hours: 0, totalHours: days * 8 }; };
         window.viewImage = (url) => { if(!url) return; $('viewer-img').src = url; $('image-viewer').classList.add('active'); };
         function compressImage(file) { return new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = (event) => { const img = new Image(); img.src = event.target.result; img.onload = () => { const canvas = document.createElement('canvas'); const MAX_WIDTH = 800; const MAX_HEIGHT = 800; let width = img.width; let height = img.height; if (width > height) { if (width > MAX_WIDTH) { height *= MAX_WIDTH / width; width = MAX_WIDTH; } } else { if (height > MAX_HEIGHT) { width *= MAX_HEIGHT / height; height = MAX_HEIGHT; } } canvas.width = width; canvas.height = height; const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0, width, height); resolve(canvas.toDataURL('image/jpeg', 0.7)); }; img.onerror = reject; }; reader.onerror = reject; reader.readAsDataURL(file); }); }
-        if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(()=>{});
+        
         window.toggleSidebar = () => { $('sidebar-panel').classList.toggle('active'); $('sidebar-backdrop').classList.toggle('active'); };
+        
         function renderSidebar() { $('menu-user-name').textContent = currentUser.displayName; $('menu-user-role').textContent = currentUser.role === 'manager' ? 'صلاحية المدير' : 'صلاحية الموظف'; const menu = $('menu-items'); menu.innerHTML = ''; const addItem = (id, label, iconPath, colorClass) => { const btn = document.createElement('button'); btn.className = `w-full text-right p-3 rounded-xl flex items-center gap-3 transition ${currentPage === id ? `bg-teal-50 text-teal-600 font-bold` : 'hover:bg-gray-50 text-gray-600'}`; btn.innerHTML = `<svg class="w-5 h-5 ${currentPage === id ? colorClass : 'text-gray-400'}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="${iconPath}"></path></svg><span>${label}</span>`; btn.onclick = () => { navigateTo(id); toggleSidebar(); }; menu.appendChild(btn); }; if (currentUser.role === 'manager') { addItem('tasks', 'المهام', 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2', 'text-teal-500'); addItem('leaves', 'الإجازات', 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z', 'text-orange-500'); addItem('mgr-balance', 'الأرصدة والموظفين', 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z', 'text-blue-500'); addItem('mgr-logs', 'سجل الحركات', 'M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z', 'text-purple-500'); } else { addItem('emp-balance', 'رصيدي', 'M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0 0V4a2 2 0 114 0v1M4 7h16M4 7v10a2 2 0 002 2h12a2 2 0 002-2V7', 'text-green-500'); addItem('tasks', 'مهامي', 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4', 'text-teal-500'); addItem('leaves', 'إجازاتي', 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z', 'text-orange-500'); addItem('overtime', 'الوقت الإضافي', 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z', 'text-indigo-500'); } }
         function navigateTo(pageId) { currentPage = pageId; document.querySelectorAll('.page').forEach(p => p.classList.add('hidden')); show(`page-${pageId}`); renderSidebar(); const fab = $('fab-btn'); if (currentUser.role === 'employee' && (pageId === 'leaves' || pageId === 'overtime')) { fab.classList.remove('hidden'); fab.onclick = () => openLeaveModal(); } else if (currentUser.role === 'manager' && pageId === 'tasks') { fab.classList.remove('hidden'); fab.onclick = () => openTaskModal(); } else { fab.classList.add('hidden'); } updateContent(); }
         async function syncUsers() { if (!fbUser) return; USERS_CONFIG.filter(u => u.role === 'employee').forEach(async (u) => { const ref = doc(db, `artifacts/${APP_ID}/public/data/employees`, u.id); if (!(await getDoc(ref)).exists()) await setDoc(ref, { balanceDays: 21, balanceHours: 0, displayName: u.displayName }); }); }
         async function logTx(empId, empName, type, val, notes) { await addDoc(collection(db, `artifacts/${APP_ID}/public/data/balance_logs`), { employeeId: empId, employeeName: empName, type, value: val, notes, date: new Date() }); }
         
-        // Render Content Function
+        // --- FULL UPDATE CONTENT FUNCTION (Restored) ---
         function updateContent() {
             if (!currentUser) return;
-            const isManager = currentUser.role === 'manager';
+            
+            if (currentUser.role === 'employee') {
+                const data = employeesData[currentUser.id] || {};
+                $('header-balance').textContent = `${data.balanceDays || 0} ي`;
+                show('header-balance');
 
-            // Employee Balance Page
-            if (currentPage === 'emp-balance' && !isManager) {
-                const empData = employeesData[currentUser.id] || { balanceDays: 21, balanceHours: 0 };
-                const headerBal = $('header-balance');
-                headerBal.classList.remove('hidden');
-                headerBal.textContent = `${empData.balanceDays} يوم`;
-                const page = $('page-emp-balance');
-                page.innerHTML = `
-                    <div class="text-center mb-6">
-                        <h2 class="text-xl font-bold text-gray-800 mb-1">رصيد الإجازات</h2>
-                        <p class="text-gray-500 text-sm">${currentUser.displayName}</p>
-                    </div>
-                    <div class="card p-6 text-center mb-4">
-                        <div class="text-5xl font-bold text-teal-600 mb-2">${empData.balanceDays}</div>
-                        <div class="text-gray-500 text-sm">يوم متبقي</div>
-                        <div class="mt-3 text-lg font-semibold text-gray-700">${empData.balanceHours || 0} ساعة</div>
-                    </div>
-                    <div class="card p-4">
-                        <h3 class="font-bold text-gray-700 mb-3">آخر الحركات</h3>
-                        <div class="space-y-2">
-                            ${balanceLogs.filter(l => l.employeeId === currentUser.id).sort((a,b) => {
-                                const da = a.date?.toDate ? a.date.toDate() : new Date(a.date);
-                                const db2 = b.date?.toDate ? b.date.toDate() : new Date(b.date);
-                                return db2 - da;
-                            }).slice(0, 10).map(l => `
-                                <div class="flex justify-between items-center p-2 bg-gray-50 rounded-lg text-sm">
-                                    <div>
-                                        <span class="font-medium ${l.type === 'خصم' ? 'text-red-500' : 'text-green-500'}">${l.type}</span>
-                                        <span class="text-gray-500 mr-2">${l.notes || ''}</span>
-                                    </div>
-                                    <div class="text-left">
-                                        <span class="font-bold ${l.type === 'خصم' ? 'text-red-500' : 'text-green-500'}">${l.type === 'خصم' ? '-' : '+'}${l.value}</span>
-                                        <div class="text-xs text-gray-400">${formatDate(l.date)}</div>
-                                    </div>
+                if (currentPage === 'emp-balance') {
+                    $('page-emp-balance').innerHTML = `
+                     <div class="card overflow-hidden">
+                        <div class="bg-gradient-to-br from-teal-600 to-teal-700 p-6 text-white rounded-t-2xl">
+                            <p class="text-teal-100 text-sm font-medium">رصيدك الحالي</p>
+                            <div class="flex items-end gap-4 mt-2">
+                                <div class="flex items-baseline gap-1">
+                                    <span class="text-5xl font-bold">${data.balanceDays || 0}</span>
+                                    <span class="text-xl text-teal-200">يوم</span>
                                 </div>
-                            `).join('') || '<p class="text-gray-400 text-center text-sm py-4">لا توجد حركات بعد</p>'}
+                                <div class="bg-white/20 px-3 py-1 rounded-full backdrop-blur-sm">
+                                    <span class="font-bold">${data.balanceHours || 0}</span>
+                                    <span class="text-xs text-teal-100">ساعة</span>
+                                </div>
+                            </div>
                         </div>
                     </div>`;
-            }
-
-            // Tasks Page
-            if (currentPage === 'tasks') {
-                const page = $('page-tasks');
-                const myTasks = isManager ? tasks : tasks.filter(t => t.assignedTo === currentUser.id);
-                page.innerHTML = `
-                    <div class="mb-4">
-                        <h2 class="text-xl font-bold text-gray-800">${isManager ? 'إدارة المهام' : 'مهامي'}</h2>
-                        <p class="text-gray-500 text-sm">${myTasks.length} مهمة</p>
-                    </div>
-                    <div class="space-y-3">
-                        ${myTasks.length === 0 ? '<div class="card p-8 text-center text-gray-400"><svg class="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg><p>لا توجد مهام حالياً</p></div>' : myTasks.map(t => {
-                            const statusColors = { 'جديدة': 'bg-blue-100 text-blue-700', 'قيد التنفيذ': 'bg-yellow-100 text-yellow-700', 'مكتملة': 'bg-green-100 text-green-700' };
-                            const statusClass = statusColors[t.status] || 'bg-gray-100 text-gray-700';
-                            const assignedEmp = USERS_CONFIG.find(u => u.id === t.assignedTo);
-                            return `
-                            <div class="card p-4">
-                                <div class="flex justify-between items-start mb-2">
-                                    <h3 class="font-bold text-gray-800">${t.title || 'بدون عنوان'}</h3>
-                                    <span class="text-xs px-2 py-1 rounded-full ${statusClass}">${t.status || 'جديدة'}</span>
-                                </div>
-                                <p class="text-gray-500 text-sm mb-3">${t.description || ''}</p>
-                                <div class="flex justify-between items-center text-xs text-gray-400">
-                                    <span>📋 ${assignedEmp ? assignedEmp.displayName : (t.assignedToName || 'غير محدد')}</span>
-                                    <span>${formatDate(t.createdAt)}</span>
-                                </div>
-                                ${t.imageUrl ? `<div class="mt-3 preview-container" onclick="viewImage('${t.imageUrl}')"><img src="${t.imageUrl}" alt="صورة المهمة"></div>` : ''}
-                                <div class="flex gap-2 mt-3">
-                                    ${!isManager && t.status !== 'مكتملة' ? `
-                                        <button onclick="updateTaskStatus('${t.id}', 'قيد التنفيذ')" class="flex-1 text-xs py-2 bg-yellow-50 text-yellow-700 rounded-lg hover:bg-yellow-100 transition font-medium">قيد التنفيذ</button>
-                                        <button onclick="updateTaskStatus('${t.id}', 'مكتملة')" class="flex-1 text-xs py-2 bg-green-50 text-green-700 rounded-lg hover:bg-green-100 transition font-medium">إكمال</button>
-                                    ` : ''}
-                                    ${isManager ? `<button onclick="deleteTask('${t.id}')" class="flex-1 text-xs py-2 bg-red-50 text-red-500 rounded-lg hover:bg-red-100 transition font-medium">حذف</button>` : ''}
-                                </div>
-                            </div>`;
-                        }).join('')}
-                    </div>`;
-            }
-
-            // Leaves Page
-            if (currentPage === 'leaves') {
-                const page = $('page-leaves');
-                const myLeaves = isManager ? leaves : leaves.filter(l => l.employeeId === currentUser.id);
-                page.innerHTML = `
-                    <div class="mb-4">
-                        <h2 class="text-xl font-bold text-gray-800">${isManager ? 'طلبات الإجازات' : 'إجازاتي'}</h2>
-                        <p class="text-gray-500 text-sm">${myLeaves.length} طلب</p>
-                    </div>
-                    <div class="space-y-3">
-                        ${myLeaves.length === 0 ? '<div class="card p-8 text-center text-gray-400"><svg class="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg><p>لا توجد طلبات إجازة</p></div>' : myLeaves.sort((a,b) => {
-                            const da = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt || 0);
-                            const db2 = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt || 0);
-                            return db2 - da;
-                        }).map(l => {
-                            const statusColors = { 'معلقة': 'bg-yellow-100 text-yellow-700', 'مقبولة': 'bg-green-100 text-green-700', 'مرفوضة': 'bg-red-100 text-red-700' };
-                            const statusClass = statusColors[l.status] || 'bg-gray-100 text-gray-700';
-                            return `
-                            <div class="card p-4">
-                                <div class="flex justify-between items-start mb-2">
-                                    <div>
-                                        ${isManager ? `<p class="font-bold text-gray-800">${l.employeeName || 'موظف'}</p>` : ''}
-                                        <p class="text-sm text-gray-600">${l.leaveType || 'إجازة'}</p>
-                                    </div>
-                                    <span class="text-xs px-2 py-1 rounded-full ${statusClass}">${l.status || 'معلقة'}</span>
-                                </div>
-                                <div class="grid grid-cols-2 gap-2 text-xs text-gray-500 mb-2">
-                                    <div>من: <span class="text-gray-700 font-medium">${formatDate(l.startDate)}</span></div>
-                                    <div>إلى: <span class="text-gray-700 font-medium">${formatDate(l.endDate)}</span></div>
-                                    <div>المدة: <span class="text-gray-700 font-medium">${l.duration || '-'} يوم</span></div>
-                                    <div>الساعات: <span class="text-gray-700 font-medium">${l.totalHours || '-'} ساعة</span></div>
-                                </div>
-                                ${l.notes ? `<p class="text-xs text-gray-500 bg-gray-50 p-2 rounded-lg mb-2">${l.notes}</p>` : ''}
-                                ${l.imageUrl ? `<div class="preview-container mb-2" style="height:120px" onclick="viewImage('${l.imageUrl}')"><img src="${l.imageUrl}" alt="مرفق"></div>` : ''}
-                                ${isManager && l.status === 'معلقة' ? `
-                                    <div class="flex gap-2 mt-2">
-                                        <button onclick="handleLeave('${l.id}', 'مقبولة')" class="flex-1 text-xs py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition font-medium">قبول</button>
-                                        <button onclick="handleLeave('${l.id}', 'مرفوضة')" class="flex-1 text-xs py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition font-medium">رفض</button>
-                                    </div>` : ''}
-                            </div>`;
-                        }).join('')}
-                    </div>`;
-            }
-
-            // Overtime Page (Employee)
-            if (currentPage === 'overtime' && !isManager) {
-                const page = $('page-overtime');
-                const myOvertime = overtimeLogs.filter(o => o.employeeId === currentUser.id).sort((a,b) => {
-                    const da = a.date?.toDate ? a.date.toDate() : new Date(a.date || 0);
-                    const db2 = b.date?.toDate ? b.date.toDate() : new Date(b.date || 0);
-                    return db2 - da;
-                });
-                page.innerHTML = `
-                    <div class="mb-4">
-                        <h2 class="text-xl font-bold text-gray-800">الوقت الإضافي</h2>
-                        <p class="text-gray-500 text-sm">${myOvertime.length} سجل</p>
-                    </div>
-                    <div class="space-y-3">
-                        ${myOvertime.length === 0 ? '<div class="card p-8 text-center text-gray-400"><svg class="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg><p>لا توجد سجلات وقت إضافي</p></div>' : myOvertime.map(o => `
-                            <div class="card p-4">
-                                <div class="flex justify-between items-center">
-                                    <div>
-                                        <p class="font-bold text-gray-800">${o.hours || 0} ساعة</p>
-                                        <p class="text-xs text-gray-500">${o.notes || ''}</p>
-                                    </div>
-                                    <div class="text-left">
-                                        <span class="text-xs px-2 py-1 rounded-full ${o.status === 'مقبولة' ? 'bg-green-100 text-green-700' : o.status === 'مرفوضة' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}">${o.status || 'معلقة'}</span>
-                                        <p class="text-xs text-gray-400 mt-1">${formatDate(o.date)}</p>
-                                    </div>
-                                </div>
-                            </div>`).join('')}
-                    </div>`;
-            }
-
-            // Manager Balance Page
-            if (currentPage === 'mgr-balance' && isManager) {
-                const page = $('page-mgr-balance');
-                const employees = USERS_CONFIG.filter(u => u.role === 'employee');
-                page.innerHTML = `
-                    <div class="mb-4">
-                        <h2 class="text-xl font-bold text-gray-800">أرصدة الموظفين</h2>
-                        <p class="text-gray-500 text-sm">${employees.length} موظف</p>
-                    </div>
-                    <div class="space-y-3">
-                        ${employees.map(emp => {
-                            const data = employeesData[emp.id] || { balanceDays: 21, balanceHours: 0 };
-                            return `
-                            <div class="card p-4">
-                                <div class="flex justify-between items-center mb-3">
-                                    <div class="flex items-center gap-3">
-                                        <div class="w-10 h-10 bg-teal-100 text-teal-600 rounded-xl flex items-center justify-center font-bold">${emp.displayName.charAt(emp.displayName.length - 1)}</div>
-                                        <div>
-                                            <p class="font-bold text-gray-800">${emp.displayName}</p>
-                                            <p class="text-xs text-gray-500">${data.balanceDays} يوم - ${data.balanceHours || 0} ساعة</p>
-                                        </div>
-                                    </div>
-                                    <div class="text-left">
-                                        <span class="text-2xl font-bold text-teal-600">${data.balanceDays}</span>
-                                        <p class="text-xs text-gray-400">يوم</p>
-                                    </div>
-                                </div>
-                                <div class="flex gap-2">
-                                    <button onclick="openAdjustBalanceModal('${emp.id}', '${emp.displayName}')" class="flex-1 text-xs py-2 bg-teal-50 text-teal-600 rounded-lg hover:bg-teal-100 transition font-medium">تعديل الرصيد</button>
-                                </div>
-                            </div>`;
-                        }).join('')}
-                    </div>`;
-            }
-
-            // Manager Logs Page
-            if (currentPage === 'mgr-logs' && isManager) {
-                const page = $('page-mgr-logs');
-                const filteredLogs = currentHistoryFilter === 'all' ? balanceLogs : balanceLogs.filter(l => l.employeeId === currentHistoryFilter);
-                const sortedLogs = filteredLogs.sort((a,b) => {
-                    const da = a.date?.toDate ? a.date.toDate() : new Date(a.date || 0);
-                    const db2 = b.date?.toDate ? b.date.toDate() : new Date(b.date || 0);
-                    return db2 - da;
-                });
-                const employees = USERS_CONFIG.filter(u => u.role === 'employee');
-                page.innerHTML = `
-                    <div class="mb-4">
-                        <h2 class="text-xl font-bold text-gray-800">سجل الحركات</h2>
-                        <p class="text-gray-500 text-sm">${sortedLogs.length} حركة</p>
-                    </div>
-                    <div class="mb-4">
-                        <select id="history-filter" onchange="filterHistory(this.value)" class="w-full px-4 py-3 rounded-xl outline-none">
-                            <option value="all" ${currentHistoryFilter === 'all' ? 'selected' : ''}>جميع الموظفين</option>
-                            ${employees.map(e => `<option value="${e.id}" ${currentHistoryFilter === e.id ? 'selected' : ''}>${e.displayName}</option>`).join('')}
-                        </select>
-                    </div>
-                    <div class="space-y-2">
-                        ${sortedLogs.length === 0 ? '<div class="card p-8 text-center text-gray-400"><p>لا توجد حركات</p></div>' : sortedLogs.map(l => `
-                            <div class="card p-3">
-                                <div class="flex justify-between items-center">
-                                    <div>
-                                        <p class="font-medium text-gray-800 text-sm">${l.employeeName || 'موظف'}</p>
-                                        <p class="text-xs text-gray-500">${l.notes || ''}</p>
-                                    </div>
-                                    <div class="text-left">
-                                        <span class="font-bold text-sm ${l.type === 'خصم' ? 'text-red-500' : 'text-green-500'}">${l.type === 'خصم' ? '-' : '+'}${l.value}</span>
-                                        <p class="text-xs text-gray-400">${formatDate(l.date)}</p>
-                                    </div>
-                                </div>
-                            </div>`).join('')}
-                    </div>`;
-            }
-        }
-
-        window.filterHistory = (val) => { currentHistoryFilter = val; updateContent(); };
-
-        // Modal Functions
-        function closeModal() { $('modal-container').classList.remove('active'); compressedImageData = null; }
-        window.closeModal = closeModal;
-
-        function openTaskModal() {
-            const employees = USERS_CONFIG.filter(u => u.role === 'employee');
-            $('modal-content').innerHTML = `
-                <div class="flex justify-between items-center mb-6">
-                    <h3 class="text-lg font-bold text-gray-800">مهمة جديدة</h3>
-                    <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
-                </div>
-                <form id="task-form" class="space-y-4">
-                    <div><label class="text-xs font-medium text-gray-600 mb-1 block">عنوان المهمة</label><input type="text" id="task-title" class="w-full px-4 py-3 rounded-xl outline-none" required></div>
-                    <div><label class="text-xs font-medium text-gray-600 mb-1 block">وصف المهمة</label><textarea id="task-desc" class="w-full px-4 py-3 rounded-xl outline-none" rows="3"></textarea></div>
-                    <div><label class="text-xs font-medium text-gray-600 mb-1 block">تعيين إلى</label>
-                        <select id="task-assign" class="w-full px-4 py-3 rounded-xl outline-none" required>
-                            <option value="">اختر موظف</option>
-                            ${employees.map(e => `<option value="${e.id}">${e.displayName}</option>`).join('')}
-                        </select>
-                    </div>
-                    <div><label class="text-xs font-medium text-gray-600 mb-1 block">صورة (اختياري)</label><input type="file" id="task-image" accept="image/*" class="w-full px-4 py-3 rounded-xl outline-none" onchange="handleImageSelect(this)"></div>
-                    <div id="task-preview" class="hidden preview-container"><img id="task-preview-img" src="" alt="معاينة"></div>
-                    <button type="submit" class="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 rounded-xl transition">إضافة المهمة</button>
-                </form>`;
-            $('modal-container').classList.add('active');
-            $('task-form').onsubmit = async (e) => {
-                e.preventDefault();
-                const title = $('task-title').value;
-                const description = $('task-desc').value;
-                const assignedTo = $('task-assign').value;
-                const assignedEmp = USERS_CONFIG.find(u => u.id === assignedTo);
-                if (!assignedTo) { showToast('اختر موظف', 'error'); return; }
-                let imageUrl = '';
-                if (compressedImageData) {
-                    try {
-                        const storageRef = ref(storage, `tasks/${Date.now()}.jpg`);
-                        await uploadString(storageRef, compressedImageData, 'data_url');
-                        imageUrl = await getDownloadURL(storageRef);
-                    } catch(e) { console.error('Image upload failed:', e); }
                 }
-                await addDoc(collection(db, `artifacts/${APP_ID}/public/data/tasks`), {
-                    title, description, assignedTo, assignedToName: assignedEmp?.displayName || '', status: 'جديدة', imageUrl, createdAt: new Date(), createdBy: currentUser.id
-                });
-                showToast('تم إضافة المهمة بنجاح');
-                closeModal();
-            };
-        }
+                
+                if (currentPage === 'tasks') {
+                    const myTasks = tasks.filter(t => 
+                        (t.assigneeId === currentUser.id || t.assigneeId === 'all') && 
+                        (t.assigneeId === 'all' ? !(t.completedBy?.some(c => c.id === currentUser.id)) : !t.completed)
+                    );
+                    $('page-tasks').innerHTML = `
+                     <div class="card p-5">
+                        <h3 class="font-bold text-lg text-gray-800 mb-4">المهام</h3>
+                        <div class="space-y-3">
+                            ${myTasks.length === 0 ? '<div class="text-center py-8 text-gray-400 text-sm">لا مهام معلقة</div>' : myTasks.map(t => `
+                                <div class="flex justify-between items-center bg-gray-50 p-3 rounded-lg border border-gray-100">
+                                    <p class="font-medium text-sm text-gray-700">${t.description}</p>
+                                    <button class="bg-teal-50 text-teal-600 px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-teal-100 transition" onclick="completeTask('${t.id}')">إنجاز</button>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>`;
+                }
 
-        function openLeaveModal() {
-            const isOvertimePage = currentPage === 'overtime';
-            if (isOvertimePage) {
-                $('modal-content').innerHTML = `
-                    <div class="flex justify-between items-center mb-6">
-                        <h3 class="text-lg font-bold text-gray-800">طلب وقت إضافي</h3>
-                        <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
-                    </div>
-                    <form id="overtime-form" class="space-y-4">
-                        <div><label class="text-xs font-medium text-gray-600 mb-1 block">عدد الساعات</label><input type="number" id="ot-hours" class="w-full px-4 py-3 rounded-xl outline-none" min="1" max="24" required></div>
-                        <div><label class="text-xs font-medium text-gray-600 mb-1 block">ملاحظات</label><textarea id="ot-notes" class="w-full px-4 py-3 rounded-xl outline-none" rows="3"></textarea></div>
-                        <button type="submit" class="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 rounded-xl transition">إرسال الطلب</button>
-                    </form>`;
-                $('modal-container').classList.add('active');
-                $('overtime-form').onsubmit = async (e) => {
-                    e.preventDefault();
-                    const hours = parseInt($('ot-hours').value);
-                    const notes = $('ot-notes').value;
-                    await addDoc(collection(db, `artifacts/${APP_ID}/public/data/overtime`), {
-                        employeeId: currentUser.id, employeeName: currentUser.displayName, hours, notes, status: 'معلقة', date: new Date()
-                    });
-                    showToast('تم إرسال طلب الوقت الإضافي');
-                    closeModal();
-                };
-            } else {
-                $('modal-content').innerHTML = `
-                    <div class="flex justify-between items-center mb-6">
-                        <h3 class="text-lg font-bold text-gray-800">طلب إجازة</h3>
-                        <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
-                    </div>
-                    <form id="leave-form" class="space-y-4">
-                        <div><label class="text-xs font-medium text-gray-600 mb-1 block">نوع الإجازة</label>
-                            <select id="leave-type" class="w-full px-4 py-3 rounded-xl outline-none" required>
-                                <option value="إعتيادية">إعتيادية</option>
-                                <option value="مرضية">مرضية</option>
-                                <option value="طارئة">طارئة</option>
-                                <option value="بدون راتب">بدون راتب</option>
+                if (currentPage === 'leaves') {
+                    const myLeaves = leaves.filter(l => l.employeeId === currentUser.id).sort((a,b) => b.date - a.date);
+                    $('page-leaves').innerHTML = `
+                     <div class="card p-5">
+                        <h3 class="font-bold text-lg text-gray-800 mb-4">طلبات الإجازات</h3>
+                        <div class="space-y-2">
+                        ${myLeaves.length === 0 ? '<p class="text-gray-400 text-center py-4 text-sm">لم تقم بتقديم طلبات بعد</p>' : myLeaves.map(l => {
+                            const statusBadge = l.status === 'Pending' ? 'bg-amber-100 text-amber-600' : (l.status === 'Approved' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600');
+                            return `
+                             <div class="border-r-4 ${l.status === 'Pending' ? 'border-amber-400 bg-amber-50' : (l.status === 'Approved' ? 'border-green-400 bg-green-50' : 'border-red-400 bg-red-50')} p-3 rounded-lg shadow-xs">
+                                <div class="flex justify-between items-center mb-1">
+                                    <span class="font-bold text-sm text-gray-800">${l.type}</span>
+                                    <span class="text-[10px] px-2 py-0.5 rounded-full ${statusBadge} font-semibold">${l.status === 'Pending' ? 'معلق' : (l.status === 'Approved' ? 'مقبول' : 'مرفوض')}</span>
+                                </div>
+                                <p class="text-xs text-gray-500">${formatDate(l.startDate)} - ${formatDate(l.endDate)}</p>
+                             </div>`;
+                        }).join('')}
+                        </div>
+                    </div>`;
+                }
+
+                if (currentPage === 'overtime') {
+                    const myOvertime = overtimeLogs.filter(o => o.employeeId === currentUser.id).sort((a,b) => b.date?.seconds - a.date?.seconds);
+                    $('page-overtime').innerHTML = `
+                     <div class="card p-5">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="font-bold text-lg text-gray-800">سجل الوقت الإضافي</h3>
+                            <button onclick="openOvertimeModal()" class="bg-indigo-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold">تسجيل جديد</button>
+                        </div>
+                        <div class="space-y-2">
+                        ${myOvertime.length === 0 ? '<p class="text-gray-400 text-center py-4 text-sm">لا توجد سجلات</p>' : myOvertime.map(o => {
+                             const statusBadge = o.status === 'Pending' ? 'bg-amber-100 text-amber-600' : (o.status === 'Approved' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600');
+                             return `
+                             <div class="bg-gray-50 p-3 rounded-lg border flex justify-between items-center">
+                                <div>
+                                    <p class="font-bold text-sm text-indigo-600">${o.hours} ساعات</p>
+                                    <p class="text-[11px] text-gray-500">${formatDate(o.date)}</p>
+                                </div>
+                                <span class="text-[10px] px-2 py-0.5 rounded-full ${statusBadge} font-semibold">${o.status === 'Pending' ? 'معلق' : (o.status === 'Approved' ? 'مقبول' : 'مرفوض')}</span>
+                             </div>`;
+                        }).join('')}
+                        </div>
+                    </div>`;
+                }
+            } 
+            else {
+                // Manager
+                hide('header-balance');
+                
+                if (currentPage === 'tasks') {
+                     $('page-tasks').innerHTML = `
+                        <div class="card p-5">
+                         <div class="mb-6 bg-gray-50 p-4 rounded-xl border border-gray-200">
+                            <h4 class="font-bold mb-3 text-sm text-gray-700">إضافة مهمة جديدة</h4>
+                            <form id="add-task-form-mgr" class="space-y-2" onsubmit="addNewTask(event)">
+                                <textarea placeholder="وصف المهمة..." class="w-full rounded-xl p-2 text-sm outline-none resize-none" rows="2" required id="mgr-task-desc"></textarea>
+                                <select class="w-full rounded-xl p-2 text-sm outline-none bg-white" required id="mgr-task-assignee">
+                                    <option value="">اختر موظف</option>
+                                    ${USERS_CONFIG.filter(u=>u.role==='employee').map(u=>`<option value="${u.id}">${u.displayName}</option>`).join('')}
+                                    <option value="all">الجميع</option>
+                                </select>
+                                <button class="w-full bg-teal-600 text-white py-2 rounded-xl font-bold text-sm shadow-sm shadow-teal-100">إضافة</button>
+                            </form>
+                        </div>
+                        <h4 class="font-bold mb-2 text-xs text-gray-400 uppercase">المهام الحالية</h4>
+                        <div class="space-y-2">
+                            ${tasks.length === 0 ? '<p class="text-gray-400 text-center text-sm py-4">لا مهام</p>' : tasks.map(t => `
+                                <div class="flex justify-between items-center p-3 bg-gray-50 rounded-xl border border-gray-100 text-sm">
+                                    <div>
+                                        <p class="font-medium text-gray-800">${t.description}</p>
+                                        <p class="text-[10px] text-gray-400 mt-0.5">${t.assigneeName}</p>
+                                    </div>
+                                    <span class="text-[10px] px-2 py-1 rounded-full font-semibold ${t.completed ? 'bg-green-100 text-green-600' : 'bg-amber-100 text-amber-600'}">${t.completed ? 'منجز' : 'معلق'}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                     </div>`;
+                }
+
+                if (currentPage === 'leaves') {
+                     const pending = leaves.filter(l => l.status === 'Pending');
+                     const processed = leaves.filter(l => l.status !== 'Pending').sort((a,b) => b.date - a.date);
+                     const pendingOvertime = overtimeLogs.filter(o => o.status === 'Pending');
+                     
+                     $('page-leaves').innerHTML = `
+                     <div class="card p-5">
+                        <h3 class="font-bold text-lg text-gray-800 mb-4">طلبات الإجازات</h3>
+                        <div class="mb-6">
+                            <h4 class="font-bold mb-2 text-xs text-orange-600 flex items-center gap-1">
+                                <span class="w-1.5 h-1.5 bg-orange-500 rounded-full animate-pulse"></span>
+                                معلقة (${pending.length})
+                            </h4>
+                            ${pending.length === 0 ? '<div class="text-center py-6 text-gray-400 text-xs">لا يوجد طلبات معلقة</div>' : pending.map(l => {
+                                const dur = calcDur(l.startDate, l.endDate);
+                                const bal = employeesData[l.employeeId] || {};
+                                return `
+                                <div class="bg-white border border-gray-200 rounded-xl p-3 mb-2 shadow-xs">
+                                    <div class="flex justify-between items-start mb-2">
+                                        <div>
+                                            <h4 class="font-bold text-sm text-gray-800">${l.employeeName}</h4>
+                                            <p class="text-[11px] text-gray-500">${l.type} (${dur.days} أيام)</p>
+                                        </div>
+                                        <span class="text-[10px] bg-blue-50 text-blue-600 px-2 py-1 rounded-full font-medium">باقي: ${bal.balanceDays || 0}ي</span>
+                                    </div>
+                                    ${l.imageUrl ? `<div class="my-2 rounded overflow-hidden"><img src="${l.imageUrl}" onclick="viewImage('${l.imageUrl}')" class="w-full h-32 object-cover cursor-pointer hover:opacity-90 transition" alt="Image"></div>` : ''}
+                                    <div class="flex gap-2 pt-2 border-t mt-2">
+                                        <button onclick="handleLeave('${l.id}', 'Approved', ${dur.totalHours})" class="flex-1 bg-green-500 text-white py-1.5 rounded-lg text-xs font-bold hover:bg-green-600">قبول</button>
+                                        <button onclick="handleLeave('${l.id}', 'Rejected', 0)" class="flex-1 bg-red-100 text-red-600 py-1.5 rounded-lg text-xs font-bold hover:bg-red-200">رفض</button>
+                                    </div>
+                                </div>`;
+                            }).join('')}
+                        </div>
+                        
+                        <div class="mb-6 border-t pt-4">
+                             <h4 class="font-bold mb-2 text-xs text-indigo-600 flex items-center gap-1">
+                                <span class="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-pulse"></span>
+                                طلبات وقت إضافي (${pendingOvertime.length})
+                            </h4>
+                            ${pendingOvertime.length === 0 ? '<div class="text-center py-4 text-gray-400 text-xs">لا يوجد</div>' : pendingOvertime.map(o => `
+                                <div class="bg-white border border-indigo-100 rounded-xl p-3 mb-2 shadow-xs">
+                                    <div class="flex justify-between items-start mb-2">
+                                        <div>
+                                            <h4 class="font-bold text-sm text-gray-800">${o.employeeName}</h4>
+                                            <p class="text-[11px] text-gray-500">التاريخ: ${formatDate(o.date)}</p>
+                                        </div>
+                                        <span class="text-[10px] bg-indigo-50 text-indigo-600 px-2 py-1 rounded-full font-bold">${o.hours} ساعات</span>
+                                    </div>
+                                    <div class="flex gap-2 pt-2 border-t mt-2">
+                                        <button onclick="handleOvertime('${o.id}', 'Approved')" class="flex-1 bg-green-500 text-white py-1.5 rounded-lg text-xs font-bold hover:bg-green-600">اعتماد</button>
+                                        <button onclick="handleOvertime('${o.id}', 'Rejected')" class="flex-1 bg-red-100 text-red-600 py-1.5 rounded-lg text-xs font-bold hover:bg-red-200">رفض</button>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                         <div>
+                            <h4 class="font-bold mb-2 text-xs text-gray-400 uppercase">سابقة</h4>
+                            <div class="space-y-1">
+                            ${processed.map(l => `
+                                 <div class="flex justify-between items-center p-2 bg-gray-50 rounded-lg text-xs">
+                                    <span class="text-gray-700">${l.employeeName} <span class="text-gray-400">(${l.type})</span></span>
+                                    <span class="font-bold ${l.status === 'Approved' ? 'text-green-500' : 'text-red-400'}">${l.status === 'Approved' ? 'مقبول' : 'مرفوض'}</span>
+                                </div>
+                            `).join('')}
+                            </div>
+                        </div>
+                    </div>`;
+                }
+
+                if (currentPage === 'mgr-balance') {
+                     $('page-mgr-balance').innerHTML = `
+                     <div class="card overflow-hidden">
+                        <div class="p-4 border-b bg-gray-50 flex items-center gap-2">
+                            <h3 class="font-bold text-gray-800">إدارة الأرصدة والموظفين</h3>
+                        </div>
+                        <div class="divide-y max-h-[50vh] overflow-y-auto">
+                            ${USERS_CONFIG.filter(u=>u.role==='employee').map(u => {
+                                const data = employeesData[u.id] || {};
+                                return `
+                                <div class="flex justify-between items-center p-3 hover:bg-gray-50 transition">
+                                    <div class="flex items-center gap-2">
+                                        <div class="w-8 h-8 rounded-full bg-teal-100 text-teal-600 flex items-center justify-center font-bold text-xs">${u.displayName.split(' ')[1]}</div>
+                                        <div><p class="font-medium text-gray-800">${u.displayName}</p></div>
+                                    </div>
+                                    <div class="flex items-center gap-3">
+                                        <div class="text-center">
+                                            <span class="font-bold text-teal-600">${data.balanceDays || 0}</span>
+                                            <span class="text-[10px] text-gray-400 block">يوم</span>
+                                        </div>
+                                        <button onclick="openEditBalanceModal('${u.id}')" class="p-1.5 text-gray-400 hover:text-teal-600 hover:bg-teal-50 rounded-lg transition">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                                        </button>
+                                    </div>
+                                </div>`;
+                            }).join('')}
+                        </div>
+                        <div id="delete-section" class="p-4 bg-red-50 border-t-2 border-red-200 mt-4">
+                            <h4 class="font-bold text-red-700 mb-3 text-sm flex items-center gap-2">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                إدارة وحذف البيانات
+                            </h4>
+                            <div class="grid grid-cols-2 gap-2 text-xs">
+                                <button onclick="triggerDelete('tasks')" class="bg-white hover:bg-gray-50 text-gray-700 py-2 rounded-lg border font-medium transition active:scale-95">🗑️ حذف المهام</button>
+                                <button onclick="triggerDelete('leaves')" class="bg-white hover:bg-gray-50 text-gray-700 py-2 rounded-lg border font-medium transition active:scale-95">🗑️ حذف الإجازات</button>
+                                <button onclick="triggerDelete('overtime')" class="bg-white hover:bg-gray-50 text-gray-700 py-2 rounded-lg border font-medium transition active:scale-95">🗑️ حذف الإضافي</button>
+                                <button onclick="triggerDelete('balance_logs')" class="bg-white hover:bg-gray-50 text-gray-700 py-2 rounded-lg border font-medium transition active:scale-95">🗑️ حذف السجل</button>
+                            </div>
+                            <button onclick="triggerDelete('all')" class="w-full mt-3 bg-red-600 hover:bg-red-700 text-white py-2.5 rounded-lg font-bold text-xs shadow-sm transition active:scale-95">
+                                ⚠️ حذف جميع البيانات نهائياً
+                            </button>
+                        </div>
+                    </div>`;
+                }
+                
+                if (currentPage === 'mgr-logs') {
+                    let filteredLogs = balanceLogs;
+                    if (currentHistoryFilter !== 'all') { filteredLogs = balanceLogs.filter(l => l.employeeId === currentHistoryFilter); }
+                    filteredLogs.sort((a,b) => b.date?.seconds - a.date?.seconds);
+                    $('page-mgr-logs').innerHTML = `
+                     <div class="card overflow-hidden">
+                        <div class="p-4 border-b bg-gray-50 flex items-center gap-2"><h3 class="font-bold text-gray-800">سجل الحركات</h3></div>
+                        <div class="p-3 bg-gray-100 border-b">
+                             <select id="log-filter-select" class="w-full border rounded-lg p-2 bg-white text-sm outline-none" onchange="applyHistoryFilter(this.value)">
+                                <option value="all" ${currentHistoryFilter === 'all' ? 'selected' : ''}>عرض الكل</option>
+                                ${USERS_CONFIG.filter(u=>u.role==='employee').map(u => `<option value="${u.id}" ${currentHistoryFilter === u.id ? 'selected' : ''}>${u.displayName}</option>`).join('')}
                             </select>
                         </div>
-                        <div><label class="text-xs font-medium text-gray-600 mb-1 block">من تاريخ</label><input type="date" id="leave-start" class="w-full px-4 py-3 rounded-xl outline-none" required></div>
-                        <div><label class="text-xs font-medium text-gray-600 mb-1 block">إلى تاريخ</label><input type="date" id="leave-end" class="w-full px-4 py-3 rounded-xl outline-none" required></div>
-                        <div id="leave-duration" class="text-sm text-gray-600 bg-gray-50 p-3 rounded-xl hidden"></div>
-                        <div><label class="text-xs font-medium text-gray-600 mb-1 block">ملاحظات</label><textarea id="leave-notes" class="w-full px-4 py-3 rounded-xl outline-none" rows="2"></textarea></div>
-                        <div><label class="text-xs font-medium text-gray-600 mb-1 block">مرفق (اختياري)</label><input type="file" id="leave-image" accept="image/*" class="w-full px-4 py-3 rounded-xl outline-none" onchange="handleImageSelect(this)"></div>
-                        <div id="leave-preview" class="hidden preview-container"><img id="leave-preview-img" src="" alt="معاينة"></div>
-                        <button type="submit" class="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 rounded-xl transition">إرسال الطلب</button>
-                    </form>`;
-                $('modal-container').classList.add('active');
-                const calcAndShow = () => {
-                    const s = $('leave-start').value, e2 = $('leave-end').value;
-                    if (s && e2) {
-                        const dur = calcDur(s, e2);
-                        $('leave-duration').classList.remove('hidden');
-                        $('leave-duration').innerHTML = `المدة: <strong>${dur.days}</strong> يوم (<strong>${dur.totalHours}</strong> ساعة)`;
-                    }
-                };
-                setTimeout(() => {
-                    if ($('leave-start')) $('leave-start').addEventListener('change', calcAndShow);
-                    if ($('leave-end')) $('leave-end').addEventListener('change', calcAndShow);
-                }, 100);
-                $('leave-form').onsubmit = async (e) => {
-                    e.preventDefault();
-                    const leaveType = $('leave-type').value;
-                    const startDate = $('leave-start').value;
-                    const endDate = $('leave-end').value;
-                    const notes = $('leave-notes').value;
-                    const dur = calcDur(startDate, endDate);
-                    if (dur.days <= 0) { showToast('تاريخ غير صحيح', 'error'); return; }
-                    let imageUrl = '';
-                    if (compressedImageData) {
-                        try {
-                            const storageRef = ref(storage, `leaves/${Date.now()}.jpg`);
-                            await uploadString(storageRef, compressedImageData, 'data_url');
-                            imageUrl = await getDownloadURL(storageRef);
-                        } catch(e) { console.error('Image upload failed:', e); }
-                    }
-                    await addDoc(collection(db, `artifacts/${APP_ID}/public/data/leaves`), {
-                        employeeId: currentUser.id, employeeName: currentUser.displayName, leaveType, startDate, endDate, duration: dur.days, totalHours: dur.totalHours, notes, imageUrl, status: 'معلقة', createdAt: new Date()
-                    });
-                    showToast('تم إرسال طلب الإجازة بنجاح');
-                    closeModal();
-                };
-            }
-        }
-
-        function openAdjustBalanceModal(empId, empName) {
-            $('modal-content').innerHTML = `
-                <div class="flex justify-between items-center mb-6">
-                    <h3 class="text-lg font-bold text-gray-800">تعديل رصيد ${empName}</h3>
-                    <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
-                </div>
-                <form id="balance-form" class="space-y-4">
-                    <div><label class="text-xs font-medium text-gray-600 mb-1 block">نوع العملية</label>
-                        <select id="bal-type" class="w-full px-4 py-3 rounded-xl outline-none">
-                            <option value="إضافة">إضافة</option>
-                            <option value="خصم">خصم</option>
-                        </select>
-                    </div>
-                    <div><label class="text-xs font-medium text-gray-600 mb-1 block">القيمة (أيام)</label><input type="number" id="bal-value" class="w-full px-4 py-3 rounded-xl outline-none" min="0.5" step="0.5" required></div>
-                    <div><label class="text-xs font-medium text-gray-600 mb-1 block">ملاحظات</label><textarea id="bal-notes" class="w-full px-4 py-3 rounded-xl outline-none" rows="2"></textarea></div>
-                    <button type="submit" class="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 rounded-xl transition">تأكيد</button>
-                </form>`;
-            $('modal-container').classList.add('active');
-            $('balance-form').onsubmit = async (e) => {
-                e.preventDefault();
-                const type = $('bal-type').value;
-                const value = parseFloat($('bal-value').value);
-                const notes = $('bal-notes').value;
-                const empRef = doc(db, `artifacts/${APP_ID}/public/data/employees`, empId);
-                const empSnap = await getDoc(empRef);
-                const empData = empSnap.exists() ? empSnap.data() : { balanceDays: 21, balanceHours: 0 };
-                const newBalance = type === 'خصم' ? empData.balanceDays - value : empData.balanceDays + value;
-                await updateDoc(empRef, { balanceDays: newBalance });
-                await logTx(empId, empName, type, value, notes);
-                showToast(`تم ${type} ${value} يوم ${type === 'خصم' ? 'من' : 'إلى'} رصيد ${empName}`);
-                closeModal();
-            };
-        }
-        window.openAdjustBalanceModal = openAdjustBalanceModal;
-
-        // Image handler
-        window.handleImageSelect = async (input) => {
-            if (input.files && input.files[0]) {
-                try {
-                    compressedImageData = await compressImage(input.files[0]);
-                    const previewId = input.id.includes('task') ? 'task-preview' : 'leave-preview';
-                    const previewImgId = input.id.includes('task') ? 'task-preview-img' : 'leave-preview-img';
-                    if ($(previewId)) { $(previewId).classList.remove('hidden'); $(previewImgId).src = compressedImageData; }
-                } catch(e) { showToast('خطأ في تحميل الصورة', 'error'); }
-            }
-        };
-
-        // Action Handlers
-        window.handleLeave = async (leaveId, newStatus) => {
-            const leave = leaves.find(l => l.id === leaveId);
-            if (!leave) return;
-            await updateDoc(doc(db, `artifacts/${APP_ID}/public/data/leaves`, leaveId), { status: newStatus });
-            if (newStatus === 'مقبولة') {
-                const empRef = doc(db, `artifacts/${APP_ID}/public/data/employees`, leave.employeeId);
-                const empSnap = await getDoc(empRef);
-                if (empSnap.exists()) {
-                    const empData = empSnap.data();
-                    const newBalance = empData.balanceDays - (leave.duration || 0);
-                    await updateDoc(empRef, { balanceDays: newBalance });
-                    await logTx(leave.employeeId, leave.employeeName, 'خصم', leave.duration, `إجازة ${leave.leaveType} - ${newStatus}`);
+                        <div class="divide-y text-xs max-h-[70vh] overflow-y-auto">
+                            ${filteredLogs.length === 0 ? '<div class="p-6 text-center text-gray-400">لا توجد حركات</div>' : filteredLogs.map(log => `
+                                <div class="flex justify-between items-start p-2 hover:bg-gray-50 transition">
+                                    <div class="flex-1">
+                                        <div class="flex items-center gap-2 mb-0.5">
+                                            <span class="font-bold ${log.type === 'adjustment' ? 'text-green-500' : 'text-red-400'}">
+                                                ${log.type === 'adjustment' ? '+' : '-'} ${log.value.days}ي
+                                            </span>
+                                        </div>
+                                        <p class="text-gray-600 text-[11px]"><span class="font-medium">${log.employeeName}</span> - <span class="text-gray-400">${log.notes}</span></p>
+                                    </div>
+                                    <span class="text-[10px] text-gray-300 font-medium">${formatDate(log.date)}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>`;
                 }
             }
-            showToast(`تم ${newStatus === 'مقبولة' ? 'قبول' : 'رفض'} طلب الإجازة`);
-        };
-
-        window.updateTaskStatus = async (taskId, newStatus) => {
-            await updateDoc(doc(db, `artifacts/${APP_ID}/public/data/tasks`, taskId), { status: newStatus });
-            showToast(`تم تحديث حالة المهمة إلى ${newStatus}`);
-        };
-
-        window.deleteTask = async (taskId) => {
-            if (confirm('هل أنت متأكد من حذف هذه المهمة؟')) {
-                await deleteDoc(doc(db, `artifacts/${APP_ID}/public/data/tasks`, taskId));
-                showToast('تم حذف المهمة');
-            }
-        };
-
-        // Delete & Reset Logic
-        window.triggerDelete = async (colName) => {
-            if (!confirm(`هل أنت متأكد من حذف جميع بيانات ${colName}؟`)) return;
-            await deleteCollection(colName);
-            showToast(`تم حذف ${colName}`);
-        };
-
-        async function deleteCollection(colName) {
-            const basePath = `artifacts/${APP_ID}/public/data`;
-            const snap = await getDocs(collection(db, `${basePath}/${colName}`));
-            const batch = writeBatch(db);
-            snap.docs.forEach(d => batch.delete(d.ref));
-            await batch.commit();
         }
-
-        // Logout
-        window.logoutUser = async () => {
-            // Unsubscribe Firestore listeners first
-            unsubListeners.forEach(fn => { try { fn(); } catch(e) {} });
-            unsubListeners = [];
-            // Unsubscribe auth listener
-            if (unsubAuth) { try { unsubAuth(); } catch(e) {} unsubAuth = null; }
-            try { await signOut(auth); } catch(e) {}
-            localStorage.removeItem('egybev_user');
-            currentUser = null; fbUser = null;
-            tasks = []; leaves = []; employeesData = {}; balanceLogs = []; overtimeLogs = [];
-            currentPage = ''; currentHistoryFilter = 'all'; compressedImageData = null;
-            hide('dashboard-container');
-            show('login-section');
-            $('header-balance').classList.add('hidden');
-            $('fab-btn').classList.add('hidden');
-            closeModal();
-            // Clear login form fields
-            $('username').value = '';
-            $('password').value = '';
-            $('login-err').classList.add('hidden');
-            // Close sidebar
-            $('sidebar-panel').classList.remove('active');
-            $('sidebar-backdrop').classList.remove('active');
-            // Clear page content
-            document.querySelectorAll('.page').forEach(p => { p.classList.add('hidden'); p.innerHTML = ''; });
-        };
         
-        // Auth & Init
+        window.applyHistoryFilter = (val) => { currentHistoryFilter = val; updateContent(); };
+        window.completeTask = async (id) => { const ref = doc(db, `artifacts/${APP_ID}/public/data/tasks`, id); const snap = await getDoc(ref); const data = snap.data(); if (data.assigneeId === 'all') { const completed = data.completedBy || []; if (!completed.some(c => c.id === currentUser.id)) { await updateDoc(ref, { completedBy: [...completed, { id: currentUser.id, name: currentUser.displayName }] }); } } else { await updateDoc(ref, { completed: true }); } showToast("تم إنجاز المهمة"); };
+        window.handleLeave = async (id, status, totalHours) => { const ref = doc(db, `artifacts/${APP_ID}/public/data/leaves`, id); const snap = await getDoc(ref); const data = snap.data(); if (status === 'Approved') { const empData = employeesData[data.employeeId] || {}; let currentTotal = ((empData.balanceDays || 0) * 8) + (empData.balanceHours || 0); let newTotal = Math.max(0, currentTotal - totalHours); const newDays = Math.floor(newTotal / 8); const newHours = newTotal % 8; await setDoc(doc(db, `artifacts/${APP_ID}/public/data/employees`, data.employeeId), { balanceDays: newDays, balanceHours: newHours }, { merge: true }); const dur = calcDur(data.startDate, data.endDate); await logTx(data.employeeId, data.employeeName, 'deduction', { days: dur.days, hours: 0 }, `إجازة ${data.type}`); } await updateDoc(ref, { status }); showToast(`تم ${status === 'Approved' ? 'القبول' : 'الرفض'}`); };
+        window.handleOvertime = async (id, status) => { const ref = doc(db, `artifacts/${APP_ID}/public/data/overtime`, id); await updateDoc(ref, { status }); showToast(`تم ${status === 'Approved' ? 'اعتماد' : 'رفض'} الطلب`); };
+        window.addNewTask = async (e) => { e.preventDefault(); const desc = $('mgr-task-desc').value; const assigneeId = $('mgr-task-assignee').value; if(!assigneeId) return showToast("اختر موظف", "error"); const assigneeName = assigneeId === 'all' ? 'الجميع' : USERS_CONFIG.find(u => u.id === assigneeId).displayName; await addDoc(collection(db, `artifacts/${APP_ID}/public/data/tasks`), { description: desc, assigneeId, assigneeName, completed: false, completedBy: [], createdAt: new Date() }); $('mgr-task-desc').value = ''; $('mgr-task-assignee').value = ''; showToast("تمت إضافة المهمة"); };
+        window.openEditBalanceModal = (empId) => { const data = employeesData[empId] || {}; const user = USERS_CONFIG.find(u => u.id === empId); $('modal-content').innerHTML = `<div class="border-b border-gray-200 pb-3 mb-3 flex justify-between items-center"><h3 class="font-bold text-lg text-gray-800">تعديل رصيد</h3><span onclick="closeModal()" class="text-gray-400 cursor-pointer hover:text-red-500 text-2xl leading-none">&times;</span></div><p class="text-sm text-gray-500 mb-4 bg-gray-50 p-2 rounded-lg">${user.displayName}</p><div class="grid grid-cols-2 gap-4 mb-6"><div><label class="text-xs text-gray-500 block mb-1">أيام</label><input type="number" id="edit-days" value="${data.balanceDays || 0}" class="w-full border rounded-xl p-3 text-center font-bold text-lg outline-none"></div><div><label class="text-xs text-gray-500 block mb-1">ساعات</label><input type="number" id="edit-hours" value="${data.balanceHours || 0}" max="7" class="w-full border rounded-xl p-3 text-center font-bold text-lg outline-none"></div></div><div class="flex gap-2"><button onclick="closeModal()" class="flex-1 bg-gray-100 py-2.5 rounded-xl font-bold text-gray-600 text-sm">إلغاء</button><button onclick="saveBalance('${empId}')" class="flex-1 bg-teal-600 text-white py-2.5 rounded-xl font-bold text-sm shadow-sm shadow-teal-100">حفظ</button></div>`; openModal(); };
+        window.saveBalance = async (empId) => { const days = parseInt($('edit-days').value) || 0; const hours = parseInt($('edit-hours').value) || 0; const user = USERS_CONFIG.find(u => u.id === empId); await setDoc(doc(db, `artifacts/${APP_ID}/public/data/employees`, empId), { balanceDays: days, balanceHours: hours }, { merge: true }); await logTx(empId, user.displayName, 'adjustment', { days, hours }, 'تعديل يدوي'); showToast("تم حفظ الرصيد"); closeModal(); };
+        window.triggerDelete = async (colName) => { const messages = { tasks: 'المهام', leaves: 'الإجازات', overtime: 'الوقت الإضافي', balance_logs: 'سجل الأرصدة', all: 'جميع البيانات' }; const msg = messages[colName] || colName; if(!confirm(`⚠️ تأكيد الحذف!\n\nسيتم حذف (${msg}) نهائياً.\nهل أنت متأكد؟`)) return; setDeleteLoading(true); try { if (colName === 'all') { await deleteCollection('tasks', false); await deleteCollection('leaves', false); await deleteCollection('overtime', false); await deleteCollection('balance_logs', false); showToast("تم حذف جميع البيانات بنجاح"); } else { await deleteCollection(colName, false); showToast(`تم حذف ${msg} بنجاح`); } } catch (error) { console.error("Delete Error:", error); showToast("حدث خطأ أثناء الحذف", "error"); } };
+        function setDeleteLoading(isLoading) { const section = $('delete-section'); if (!section) return; if (isLoading) { section.innerHTML = `<div class="p-6 text-center text-gray-500"><svg class="animate-spin h-6 w-6 mx-auto mb-2 text-teal-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>جاري الحذف...</div>`; } }
+        async function deleteCollection(colName, confirmNeeded = true) { if (confirmNeeded) return; const ref = collection(db, `artifacts/${APP_ID}/public/data/${colName}`); const snap = await getDocs(ref); const batch = writeBatch(db); snap.docs.forEach((d) => { batch.delete(d.ref); }); await batch.commit(); }
+        window.openLeaveModal = () => { compressedImageData = null; $('modal-content').innerHTML = `<div class="border-b border-gray-200 pb-3 mb-3 flex justify-between items-center"><h3 class="font-bold text-lg text-gray-800">طلب إجازة</h3><span onclick="closeModal()" class="text-gray-400 cursor-pointer hover:text-red-500 text-2xl leading-none">&times;</span></div><form id="leave-form" class="space-y-3" onsubmit="submitLeave(event)"><div class="grid grid-cols-2 gap-3"><div><label class="text-xs text-gray-500 block mb-1">من تاريخ</label><input type="date" id="l-start" class="w-full rounded-xl p-2.5 text-sm outline-none" required></div><div><label class="text-xs text-gray-500 block mb-1">إلى تاريخ</label><input type="date" id="l-end" class="w-full rounded-xl p-2.5 text-sm outline-none" required></div></div><div><label class="text-xs text-gray-500 block mb-1">نوع الإجازة</label><select id="l-type" class="w-full rounded-xl p-2.5 text-sm bg-white outline-none" required><option value="اعتيادية">اعتيادية</option><option value="مرضية">مرضية</option><option value="طارئة">طارئة</option></select></div><div><label class="text-xs text-gray-500 block mb-1">ملاحظات</label><textarea id="l-notes" rows="2" class="w-full rounded-xl p-2.5 text-sm resize-none outline-none" placeholder="اختياري"></textarea></div><div><label class="block text-xs text-gray-500 mb-1 mt-1">صورة (اختياري)</label><input type="file" id="l-image" accept="image/*" class="hidden" onchange="handleImageSelect(event)"><button type="button" onclick="document.getElementById('l-image').click()" class="w-full border-2 border-dashed border-gray-200 rounded-xl p-3 flex flex-col items-center justify-center hover:border-teal-400 transition overflow-hidden"><div id="upload-placeholder"><svg class="w-6 h-6 mx-auto text-gray-400 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg><span class="text-xs text-gray-500">اضغط لاختيار صورة</span></div><div id="upload-preview" class="hidden w-full fade-in"><div class="preview-container border-none shadow-none bg-transparent h-48"><img id="img-preview-src" src="" alt="Preview"><div class="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-[10px] py-1 text-center">تم الضغط - جاهزة للرفع</div></div></div></button></div><button type="submit" id="submit-leave-btn" class="w-full bg-orange-500 text-white py-2.5 rounded-xl font-bold text-sm mt-2 shadow-sm shadow-orange-100">إرسال الطلب</button></form>`; openModal(); };
+        window.openOvertimeModal = () => { $('modal-content').innerHTML = `<div class="border-b border-gray-200 pb-3 mb-3 flex justify-between items-center"><h3 class="font-bold text-lg text-gray-800">تسجيل وقت إضافي</h3><span onclick="closeModal()" class="text-gray-400 cursor-pointer hover:text-red-500 text-2xl leading-none">&times;</span></div><form id="overtime-form" class="space-y-3" onsubmit="submitOvertime(event)"><div><label class="text-xs text-gray-500 block mb-1">التاريخ</label><input type="date" id="ot-date" class="w-full rounded-xl p-2.5 text-sm outline-none" required></div><div><label class="text-xs text-gray-500 block mb-1">عدد الساعات</label><input type="number" id="ot-hours" min="0.5" step="0.5" class="w-full rounded-xl p-2.5 text-sm outline-none" placeholder="مثال: 2.5" required></div><div><label class="text-xs text-gray-500 block mb-1">ملاحظات</label><textarea id="ot-notes" rows="2" class="w-full rounded-xl p-2.5 text-sm resize-none outline-none" placeholder="سبب الوقت الإضافي (اختياري)"></textarea></div><button type="submit" class="w-full bg-indigo-500 text-white py-2.5 rounded-xl font-bold text-sm mt-2 shadow-sm shadow-indigo-100">إرسال</button></form>`; openModal(); };
+        window.handleImageSelect = async (event) => { const file = event.target.files[0]; if (!file) return; $('upload-placeholder').innerHTML = `<div class="flex items-center gap-2 text-teal-600"><svg class="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg><span class="text-xs font-bold">جاري الضغط...</span></div>`; try { compressedImageData = await compressImage(file); $('img-preview-src').src = compressedImageData; $('upload-placeholder').classList.add('hidden'); $('upload-preview').classList.remove('hidden'); } catch (err) { showToast("فشل في معالجة الصورة", "error"); $('upload-placeholder').innerHTML = `<span class="text-xs text-red-500">فشل المعالجة</span>`; } };
+        window.submitOvertime = async (e) => { e.preventDefault(); const dateVal = $('ot-date').value; const hours = parseFloat($('ot-hours').value); const notes = $('ot-notes').value; if (!dateVal || !hours) return showToast("جميع الحقول مطلوبة", "error"); await addDoc(collection(db, `artifacts/${APP_ID}/public/data/overtime`), { employeeId: currentUser.id, employeeName: currentUser.displayName, date: new Date(dateVal), hours: hours, notes: notes, status: 'Pending', createdAt: new Date() }); closeModal(); showToast("تم تسجيل الوقت الإضافي"); };
+        window.submitLeave = async (e) => { e.preventDefault(); const btn = $('submit-leave-btn'); btn.disabled = true; btn.innerHTML = `<span class="flex items-center justify-center gap-2"><svg class="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> جاري الإرسال...</span>`; let imageUrl = null; if (compressedImageData) { try { const storageRef = ref(storage, `leave_attachments/${Date.now()}.jpg`); await uploadString(storageRef, compressedImageData, 'data_url'); imageUrl = await getDownloadURL(storageRef); } catch(err) { console.error(err); showToast("خطأ في رفع الصورة", "error"); btn.disabled = false; btn.textContent = "إرسال الطلب"; return; } } await addDoc(collection(db, `artifacts/${APP_ID}/public/data/leaves`), { employeeId: currentUser.id, employeeName: currentUser.displayName, startDate: $('l-start').value, endDate: $('l-end').value, type: $('l-type').value, notes: $('l-notes').value, imageUrl, status: 'Pending', createdAt: new Date() }); closeModal(); showToast("تم إرسال الطلب"); };
+        window.openModal = () => { $('modal-container').classList.add('active'); document.body.style.overflow = 'hidden'; };
+        window.closeModal = () => { $('modal-container').classList.remove('active'); document.body.style.overflow = ''; };
+        window.openTaskModal = () => { $('mgr-task-desc').focus(); };
+        window.logoutUser = async () => { await signOut(auth); localStorage.removeItem('egybev_user'); location.reload(); };
+        window.handleFab = () => { if(currentUser.role === 'employee') { if(currentPage === 'overtime') openOvertimeModal(); else openLeaveModal(); } else if(currentUser.role === 'manager') openTaskModal(); }
         $('login-form').addEventListener('submit', (e) => { e.preventDefault(); const user = USERS_CONFIG.find(x => x.username === $('username').value && x.password === $('password').value); if (user) { currentUser = user; localStorage.setItem('egybev_user', JSON.stringify(user)); $('login-err').classList.add('hidden'); initApp(); } else { $('login-err').classList.remove('hidden'); } });
-        async function initApp() { const storedUser = localStorage.getItem('egybev_user'); if (!storedUser) return; currentUser = JSON.parse(storedUser); if (unsubAuth) { try { unsubAuth(); } catch(e) {} unsubAuth = null; } unsubAuth = onAuthStateChanged(auth, async (user) => { if (user) { fbUser = user; await syncUsers(); setupListeners(); hide('login-section'); show('dashboard-container'); renderSidebar(); if (currentUser.role === 'manager') navigateTo('tasks'); else navigateTo('emp-balance'); } else { try { await signInAnonymously(auth); } catch(e) { console.error(e); } } }); }
-        function setupListeners() { unsubListeners.forEach(fn => { try { fn(); } catch(e) {} }); unsubListeners = []; const basePath = `artifacts/${APP_ID}/public/data`; unsubListeners.push(onSnapshot(collection(db, `${basePath}/employees`), (snap) => { snap.forEach(d => employeesData[d.id] = d.data()); updateContent(); })); unsubListeners.push(onSnapshot(query(collection(db, `${basePath}/tasks`)), (snap) => { tasks = snap.docs.map(d => ({ id: d.id, ...d.data() })); updateContent(); })); unsubListeners.push(onSnapshot(query(collection(db, `${basePath}/leaves`)), (snap) => { leaves = snap.docs.map(d => ({ id: d.id, ...d.data() })); updateContent(); })); unsubListeners.push(onSnapshot(query(collection(db, `${basePath}/balance_logs`)), (snap) => { balanceLogs = snap.docs.map(d => ({ id: d.id, ...d.data() })); updateContent(); })); unsubListeners.push(onSnapshot(query(collection(db, `${basePath}/overtime`)), (snap) => { overtimeLogs = snap.docs.map(d => ({ id: d.id, ...d.data() })); updateContent(); })); }
+        async function initApp() { const storedUser = localStorage.getItem('egybev_user'); if (!storedUser) return; currentUser = JSON.parse(storedUser); onAuthStateChanged(auth, async (user) => { if (user) { fbUser = user; await syncUsers(); setupListeners(); hide('login-section'); show('dashboard-container'); renderSidebar(); if (currentUser.role === 'manager') navigateTo('tasks'); else navigateTo('emp-balance'); } else { try { await signInAnonymously(auth); } catch(e) { console.error(e); } } }); }
+        function setupListeners() { const basePath = `artifacts/${APP_ID}/public/data`; onSnapshot(collection(db, `${basePath}/employees`), (snap) => { snap.forEach(d => employeesData[d.id] = d.data()); updateContent(); }); onSnapshot(query(collection(db, `${basePath}/tasks`)), (snap) => { tasks = snap.docs.map(d => ({ id: d.id, ...d.data() })); updateContent(); }); onSnapshot(query(collection(db, `${basePath}/leaves`)), (snap) => { leaves = snap.docs.map(d => ({ id: d.id, ...d.data() })); updateContent(); }); onSnapshot(query(collection(db, `${basePath}/balance_logs`)), (snap) => { balanceLogs = snap.docs.map(d => ({ id: d.id, ...d.data() })); updateContent(); }); onSnapshot(query(collection(db, `${basePath}/overtime`)), (snap) => { overtimeLogs = snap.docs.map(d => ({ id: d.id, ...d.data() })); updateContent(); }); }
         initApp();
     </script>
 </body>
-
 </html>

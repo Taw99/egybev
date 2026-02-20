@@ -5,12 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#115e59">
     <title>EgyBev HR System</title>
-    
-    <!-- Embedded PWA Manifest -->
     <link rel="manifest" href="data:application/json;base64,eyJuYW1lIjoiRWd5QmV2IEhSIiwic2hvcnRfbmFtZSI6IkVneUJldiIsInN0YXJ0X3VybCI6Ii4iLCJkaXNwbGF5Ijoic3RhbmRhbG9uZSIsImJhY2tncm91bmRfY29sb3IiOiIjZjFmNWY5IiwidGhlbWVfY29sb3IiOiIjMTE1ZTU5In0=">
     <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/2942/2942813.png">
-
-    <!-- Resources -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     
@@ -155,7 +151,6 @@
         async function syncUsers() { if (!fbUser) return; USERS_CONFIG.filter(u => u.role === 'employee').forEach(async (u) => { const ref = doc(db, `artifacts/${APP_ID}/public/data/employees`, u.id); if (!(await getDoc(ref)).exists()) await setDoc(ref, { balanceDays: 21, balanceHours: 0, displayName: u.displayName }); }); }
         async function logTx(empId, empName, type, val, notes) { await addDoc(collection(db, `artifacts/${APP_ID}/public/data/balance_logs`), { employeeId: empId, employeeName: empName, type, value: val, notes, date: new Date() }); }
         
-        // --- FULL UPDATE CONTENT FUNCTION (Restored) ---
         function updateContent() {
             if (!currentUser) return;
             
@@ -269,12 +264,29 @@
                         <h4 class="font-bold mb-2 text-xs text-gray-400 uppercase">المهام الحالية</h4>
                         <div class="space-y-2">
                             ${tasks.length === 0 ? '<p class="text-gray-400 text-center text-sm py-4">لا مهام</p>' : tasks.map(t => `
-                                <div class="flex justify-between items-center p-3 bg-gray-50 rounded-xl border border-gray-100 text-sm">
-                                    <div>
-                                        <p class="font-medium text-gray-800">${t.description}</p>
-                                        <p class="text-[10px] text-gray-400 mt-0.5">${t.assigneeName}</p>
+                                <div class="p-3 bg-gray-50 rounded-xl border border-gray-100 text-sm">
+                                    <div class="flex justify-between items-center">
+                                        <div>
+                                            <p class="font-medium text-gray-800">${t.description}</p>
+                                            <p class="text-[10px] text-gray-400 mt-0.5">${t.assigneeName}</p>
+                                        </div>
+                                        <span class="text-[10px] px-2 py-1 rounded-full font-semibold ${t.completed ? 'bg-green-100 text-green-600' : 'bg-amber-100 text-amber-600'}">${t.completed ? 'منجز' : 'معلق'}</span>
                                     </div>
-                                    <span class="text-[10px] px-2 py-1 rounded-full font-semibold ${t.completed ? 'bg-green-100 text-green-600' : 'bg-amber-100 text-amber-600'}">${t.completed ? 'منجز' : 'معلق'}</span>
+                                    
+                                    <!-- List of employees who completed the task (if applicable) -->
+                                    ${t.assigneeId === 'all' && t.completedBy && t.completedBy.length > 0 ? `
+                                    <div class="mt-2 pt-2 border-t border-gray-200 border-dashed">
+                                        <p class="text-[10px] text-gray-500 mb-1">تم الإنجاز بواسطة:</p>
+                                        <div class="flex flex-wrap gap-1">
+                                            ${t.completedBy.map(c => `
+                                                <span class="inline-flex items-center gap-1 bg-green-50 text-green-700 text-[10px] px-2 py-0.5 rounded-full">
+                                                    <svg class="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
+                                                    ${c.name}
+                                                </span>
+                                            `).join('')}
+                                        </div>
+                                    </div>
+                                    ` : ''}
                                 </div>
                             `).join('')}
                         </div>
@@ -356,7 +368,7 @@
                         <div class="p-4 border-b bg-gray-50 flex items-center gap-2">
                             <h3 class="font-bold text-gray-800">إدارة الأرصدة والموظفين</h3>
                         </div>
-                        <div class="divide-y max-h-[50vh] overflow-y-auto">
+                        <div class="divide-y max-h-[70vh] overflow-y-auto">
                             ${USERS_CONFIG.filter(u=>u.role==='employee').map(u => {
                                 const data = employeesData[u.id] || {};
                                 return `
@@ -377,21 +389,6 @@
                                 </div>`;
                             }).join('')}
                         </div>
-                        <div id="delete-section" class="p-4 bg-red-50 border-t-2 border-red-200 mt-4">
-                            <h4 class="font-bold text-red-700 mb-3 text-sm flex items-center gap-2">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                                إدارة وحذف البيانات
-                            </h4>
-                            <div class="grid grid-cols-2 gap-2 text-xs">
-                                <button onclick="triggerDelete('tasks')" class="bg-white hover:bg-gray-50 text-gray-700 py-2 rounded-lg border font-medium transition active:scale-95">🗑️ حذف المهام</button>
-                                <button onclick="triggerDelete('leaves')" class="bg-white hover:bg-gray-50 text-gray-700 py-2 rounded-lg border font-medium transition active:scale-95">🗑️ حذف الإجازات</button>
-                                <button onclick="triggerDelete('overtime')" class="bg-white hover:bg-gray-50 text-gray-700 py-2 rounded-lg border font-medium transition active:scale-95">🗑️ حذف الإضافي</button>
-                                <button onclick="triggerDelete('balance_logs')" class="bg-white hover:bg-gray-50 text-gray-700 py-2 rounded-lg border font-medium transition active:scale-95">🗑️ حذف السجل</button>
-                            </div>
-                            <button onclick="triggerDelete('all')" class="w-full mt-3 bg-red-600 hover:bg-red-700 text-white py-2.5 rounded-lg font-bold text-xs shadow-sm transition active:scale-95">
-                                ⚠️ حذف جميع البيانات نهائياً
-                            </button>
-                        </div>
                     </div>`;
                 }
                 
@@ -408,7 +405,7 @@
                                 ${USERS_CONFIG.filter(u=>u.role==='employee').map(u => `<option value="${u.id}" ${currentHistoryFilter === u.id ? 'selected' : ''}>${u.displayName}</option>`).join('')}
                             </select>
                         </div>
-                        <div class="divide-y text-xs max-h-[70vh] overflow-y-auto">
+                        <div class="divide-y text-xs max-h-[40vh] overflow-y-auto">
                             ${filteredLogs.length === 0 ? '<div class="p-6 text-center text-gray-400">لا توجد حركات</div>' : filteredLogs.map(log => `
                                 <div class="flex justify-between items-start p-2 hover:bg-gray-50 transition">
                                     <div class="flex-1">
@@ -422,6 +419,23 @@
                                     <span class="text-[10px] text-gray-300 font-medium">${formatDate(log.date)}</span>
                                 </div>
                             `).join('')}
+                        </div>
+                        
+                        <!-- DELETE SECTION MOVED HERE -->
+                        <div id="delete-section" class="p-4 bg-red-50 border-t-2 border-red-200 mt-2">
+                            <h4 class="font-bold text-red-700 mb-3 text-sm flex items-center gap-2">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                إدارة وحذف البيانات
+                            </h4>
+                            <div class="grid grid-cols-2 gap-2 text-xs">
+                                <button onclick="triggerDelete('tasks')" class="bg-white hover:bg-gray-50 text-gray-700 py-2 rounded-lg border font-medium transition active:scale-95">🗑️ حذف المهام</button>
+                                <button onclick="triggerDelete('leaves')" class="bg-white hover:bg-gray-50 text-gray-700 py-2 rounded-lg border font-medium transition active:scale-95">🗑️ حذف الإجازات</button>
+                                <button onclick="triggerDelete('overtime')" class="bg-white hover:bg-gray-50 text-gray-700 py-2 rounded-lg border font-medium transition active:scale-95">🗑️ حذف الإضافي</button>
+                                <button onclick="triggerDelete('balance_logs')" class="bg-white hover:bg-gray-50 text-gray-700 py-2 rounded-lg border font-medium transition active:scale-95">🗑️ حذف السجل</button>
+                            </div>
+                            <button onclick="triggerDelete('all')" class="w-full mt-3 bg-red-600 hover:bg-red-700 text-white py-2.5 rounded-lg font-bold text-xs shadow-sm transition active:scale-95">
+                                ⚠️ حذف جميع البيانات نهائياً
+                            </button>
                         </div>
                     </div>`;
                 }

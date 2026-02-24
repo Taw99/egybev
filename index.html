@@ -4,9 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#115e59">
-    <title>EgyBev</title>
-    <link rel="manifest" href="data:application/json;base64,eyJuYW1lIjoiRWd5QmV2IEhSIiwic2hvcnRfbmFtZSI6IkVneUJldiIsInN0YXJ0X3VybCI6Ii4iLCJkaXNwbGF5Ijoic3RhbmRhbG9uZSIsImJhY2tncm91bmRfY29sb3IiOiIjZjFmNWY5IiwidGhlbWVfY29sb3IiOiIjMTE1ZTU5In0=">
+    <title>EgyBev HR System</title>
+    
+    <!-- Default Icon (Will be replaced dynamically) -->
+    <link rel="icon" type="image/png" href="https://cdn-icons-png.flaticon.com/512/2942/2942813.png">
     <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/2942/2942813.png">
+    <link rel="manifest" href="data:application/json;base64,eyJuYW1lIjoiRWd5QmV2IEhSIiwic2hvcnRfbmFtZSI6IkVneUJldiIsInN0YXJ0X3VybCI6Ii4iLCJkaXNwbGF5Ijoic3RhbmRhbG9uZSIsImJhY2tncm91bmRfY29sb3IiOiIjZjFmNWY5IiwidGhlbWVfY29sb3IiOiIjMTE1ZTU5In0=">
+
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     
@@ -27,7 +31,7 @@
         @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
         .preview-container { position: relative; width: 100%; height: 200px; background-color: #f1f5f9; border-radius: 0.75rem; overflow: hidden; display: flex; align-items: center; justify-content: center; cursor: pointer; }
         .preview-container img { width: 100%; height: 100%; object-fit: cover; }
-        .viewer-overlay { position: fixed; inset: 0; z-[60]; background: rgba(0,0,0,0.9); display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.3s; }
+        .viewer-overlay { position: fixed; inset: 0; z-index: 60; background: rgba(0,0,0,0.9); display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.3s; }
         .viewer-overlay.active { opacity: 1; pointer-events: auto; }
         .viewer-overlay img { max-width: 95%; max-height: 95%; object-fit: contain; border-radius: 0.5rem; }
         .modal-overlay { position: fixed; inset: 0; z-index: 50; background: rgba(0, 0, 0, 0.4); opacity: 0; pointer-events: none; transition: opacity 0.3s ease; display: flex; align-items: center; justify-content: flex-end; }
@@ -142,7 +146,52 @@
         const formatDate = (d) => { if (!d) return '-'; const date = d.toDate ? d.toDate() : new Date(d); const day = String(date.getDate()).padStart(2, '0'); const month = String(date.getMonth() + 1).padStart(2, '0'); const year = date.getFullYear(); return `${day}/${month}/${year}`; };
         const calcDur = (s, e) => { const d1 = new Date(s), d2 = new Date(e); if (d2 < d1) return { days: 0, hours: 0, totalHours: 0 }; const days = Math.ceil(Math.abs(d2 - d1) / (1000 * 60 * 60 * 24)) + 1; return { days, hours: 0, totalHours: days * 8 }; };
         window.viewImage = (url) => { if(!url) return; $('viewer-img').src = url; $('image-viewer').classList.add('active'); };
-        function compressImage(file) { return new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = (event) => { const img = new Image(); img.src = event.target.result; img.onload = () => { const canvas = document.createElement('canvas'); const MAX_WIDTH = 800; const MAX_HEIGHT = 800; let width = img.width; let height = img.height; if (width > height) { if (width > MAX_WIDTH) { height *= MAX_WIDTH / width; width = MAX_WIDTH; } } else { if (height > MAX_HEIGHT) { width *= MAX_HEIGHT / height; height = MAX_HEIGHT; } } canvas.width = width; canvas.height = height; const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0, width, height); resolve(canvas.toDataURL('image/jpeg', 0.7)); }; img.onerror = reject; }; reader.onerror = reject; reader.readAsDataURL(file); }); }
+        
+        // Modified Compress to make it square (Icon Compatible)
+        function compressImage(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const img = new Image();
+                    img.src = event.target.result;
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        const SIZE = 512; // Fixed size for icon
+                        canvas.width = SIZE;
+                        canvas.height = SIZE;
+                        const ctx = canvas.getContext('2d');
+                        
+                        // Calculate scaling to cover the square
+                        const scale = Math.max(SIZE / img.width, SIZE / img.height);
+                        const x = (SIZE / 2) - (img.width / 2) * scale;
+                        const y = (SIZE / 2) - (img.height / 2) * scale;
+                        
+                        ctx.drawImage(img, x, y, img.width * scale, img.height * scale);
+                        resolve(canvas.toDataURL('image/jpeg', 0.8));
+                    };
+                    img.onerror = reject;
+                };
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+        }
+
+        // Function to set App Icon dynamically
+        function setAppIcon(url) {
+            if(!url) return;
+            // Set Browser Tab Icon
+            const link = document.querySelector("link[rel*='icon']") || document.createElement('link');
+            link.type = 'image/png';
+            link.rel = 'icon';
+            link.href = url;
+            document.getElementsByTagName('head')[0].appendChild(link);
+
+            // Set Apple Touch Icon (Home Screen Icon)
+            const appleLink = document.querySelector("link[rel='apple-touch-icon']") || document.createElement('link');
+            appleLink.rel = 'apple-touch-icon';
+            appleLink.href = url;
+            document.getElementsByTagName('head')[0].appendChild(appleLink);
+        }
         
         window.toggleSidebar = () => { $('sidebar-panel').classList.toggle('active'); $('sidebar-backdrop').classList.toggle('active'); };
         
@@ -272,8 +321,6 @@
                                         </div>
                                         <span class="text-[10px] px-2 py-1 rounded-full font-semibold ${t.completed ? 'bg-green-100 text-green-600' : 'bg-amber-100 text-amber-600'}">${t.completed ? 'منجز' : 'معلق'}</span>
                                     </div>
-                                    
-                                    <!-- List of employees who completed the task (if applicable) -->
                                     ${t.assigneeId === 'all' && t.completedBy && t.completedBy.length > 0 ? `
                                     <div class="mt-2 pt-2 border-t border-gray-200 border-dashed">
                                         <p class="text-[10px] text-gray-500 mb-1">تم الإنجاز بواسطة:</p>
@@ -421,7 +468,7 @@
                             `).join('')}
                         </div>
                         
-                        <!-- DELETE SECTION MOVED HERE -->
+                        <!-- DELETE SECTION -->
                         <div id="delete-section" class="p-4 bg-red-50 border-t-2 border-red-200 mt-2">
                             <h4 class="font-bold text-red-700 mb-3 text-sm flex items-center gap-2">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
@@ -452,11 +499,40 @@
         window.triggerDelete = async (colName) => { const messages = { tasks: 'المهام', leaves: 'الإجازات', overtime: 'الوقت الإضافي', balance_logs: 'سجل الأرصدة', all: 'جميع البيانات' }; const msg = messages[colName] || colName; if(!confirm(`⚠️ تأكيد الحذف!\n\nسيتم حذف (${msg}) نهائياً.\nهل أنت متأكد؟`)) return; setDeleteLoading(true); try { if (colName === 'all') { await deleteCollection('tasks', false); await deleteCollection('leaves', false); await deleteCollection('overtime', false); await deleteCollection('balance_logs', false); showToast("تم حذف جميع البيانات بنجاح"); } else { await deleteCollection(colName, false); showToast(`تم حذف ${msg} بنجاح`); } } catch (error) { console.error("Delete Error:", error); showToast("حدث خطأ أثناء الحذف", "error"); } };
         function setDeleteLoading(isLoading) { const section = $('delete-section'); if (!section) return; if (isLoading) { section.innerHTML = `<div class="p-6 text-center text-gray-500"><svg class="animate-spin h-6 w-6 mx-auto mb-2 text-teal-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>جاري الحذف...</div>`; } }
         async function deleteCollection(colName, confirmNeeded = true) { if (confirmNeeded) return; const ref = collection(db, `artifacts/${APP_ID}/public/data/${colName}`); const snap = await getDocs(ref); const batch = writeBatch(db); snap.docs.forEach((d) => { batch.delete(d.ref); }); await batch.commit(); }
-        window.openLeaveModal = () => { compressedImageData = null; $('modal-content').innerHTML = `<div class="border-b border-gray-200 pb-3 mb-3 flex justify-between items-center"><h3 class="font-bold text-lg text-gray-800">طلب إجازة</h3><span onclick="closeModal()" class="text-gray-400 cursor-pointer hover:text-red-500 text-2xl leading-none">&times;</span></div><form id="leave-form" class="space-y-3" onsubmit="submitLeave(event)"><div class="grid grid-cols-2 gap-3"><div><label class="text-xs text-gray-500 block mb-1">من تاريخ</label><input type="date" id="l-start" class="w-full rounded-xl p-2.5 text-sm outline-none" required></div><div><label class="text-xs text-gray-500 block mb-1">إلى تاريخ</label><input type="date" id="l-end" class="w-full rounded-xl p-2.5 text-sm outline-none" required></div></div><div><label class="text-xs text-gray-500 block mb-1">نوع الإجازة</label><select id="l-type" class="w-full rounded-xl p-2.5 text-sm bg-white outline-none" required><option value="اعتيادية">اعتيادية</option><option value="مرضية">مرضية</option><option value="طارئة">طارئة</option></select></div><div><label class="text-xs text-gray-500 block mb-1">ملاحظات</label><textarea id="l-notes" rows="2" class="w-full rounded-xl p-2.5 text-sm resize-none outline-none" placeholder="اختياري"></textarea></div><div><label class="block text-xs text-gray-500 mb-1 mt-1">صورة (اختياري)</label><input type="file" id="l-image" accept="image/*" class="hidden" onchange="handleImageSelect(event)"><button type="button" onclick="document.getElementById('l-image').click()" class="w-full border-2 border-dashed border-gray-200 rounded-xl p-3 flex flex-col items-center justify-center hover:border-teal-400 transition overflow-hidden"><div id="upload-placeholder"><svg class="w-6 h-6 mx-auto text-gray-400 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg><span class="text-xs text-gray-500">اضغط لاختيار صورة</span></div><div id="upload-preview" class="hidden w-full fade-in"><div class="preview-container border-none shadow-none bg-transparent h-48"><img id="img-preview-src" src="" alt="Preview"><div class="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-[10px] py-1 text-center">تم الضغط - جاهزة للرفع</div></div></div></button></div><button type="submit" id="submit-leave-btn" class="w-full bg-orange-500 text-white py-2.5 rounded-xl font-bold text-sm mt-2 shadow-sm shadow-orange-100">إرسال الطلب</button></form>`; openModal(); };
+        window.openLeaveModal = () => { compressedImageData = null; $('modal-content').innerHTML = `<div class="border-b border-gray-200 pb-3 mb-3 flex justify-between items-center"><h3 class="font-bold text-lg text-gray-800">طلب إجازة</h3><span onclick="closeModal()" class="text-gray-400 cursor-pointer hover:text-red-500 text-2xl leading-none">&times;</span></div><form id="leave-form" class="space-y-3" onsubmit="submitLeave(event)"><div class="grid grid-cols-2 gap-3"><div><label class="text-xs text-gray-500 block mb-1">من تاريخ</label><input type="date" id="l-start" class="w-full rounded-xl p-2.5 text-sm outline-none" required></div><div><label class="text-xs text-gray-500 block mb-1">إلى تاريخ</label><input type="date" id="l-end" class="w-full rounded-xl p-2.5 text-sm outline-none" required></div></div><div><label class="text-xs text-gray-500 block mb-1">نوع الإجازة</label><select id="l-type" class="w-full rounded-xl p-2.5 text-sm bg-white outline-none" required><option value="اعتيادية">اعتيادية</option><option value="مرضية">مرضية</option><option value="طارئة">طارئة</option></select></div><div><label class="text-xs text-gray-500 block mb-1">ملاحظات</label><textarea id="l-notes" rows="2" class="w-full rounded-xl p-2.5 text-sm resize-none outline-none" placeholder="اختياري"></textarea></div><div><label class="block text-xs text-gray-500 mb-1 mt-1">صورة (اختياري - ستظهر كأيقونة للتطبيق)</label><input type="file" id="l-image" accept="image/*" class="hidden" onchange="handleImageSelect(event)"><button type="button" onclick="document.getElementById('l-image').click()" class="w-full border-2 border-dashed border-gray-200 rounded-xl p-3 flex flex-col items-center justify-center hover:border-teal-400 transition overflow-hidden"><div id="upload-placeholder"><svg class="w-6 h-6 mx-auto text-gray-400 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg><span class="text-xs text-gray-500">اضغط لاختيار صورة</span></div><div id="upload-preview" class="hidden w-full fade-in"><div class="preview-container border-none shadow-none bg-transparent h-48"><img id="img-preview-src" src="" alt="Preview"><div class="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-[10px] py-1 text-center">تم الضغط - جاهزة للرفع</div></div></div></button></div><button type="submit" id="submit-leave-btn" class="w-full bg-orange-500 text-white py-2.5 rounded-xl font-bold text-sm mt-2 shadow-sm shadow-orange-100">إرسال الطلب</button></form>`; openModal(); };
         window.openOvertimeModal = () => { $('modal-content').innerHTML = `<div class="border-b border-gray-200 pb-3 mb-3 flex justify-between items-center"><h3 class="font-bold text-lg text-gray-800">تسجيل وقت إضافي</h3><span onclick="closeModal()" class="text-gray-400 cursor-pointer hover:text-red-500 text-2xl leading-none">&times;</span></div><form id="overtime-form" class="space-y-3" onsubmit="submitOvertime(event)"><div><label class="text-xs text-gray-500 block mb-1">التاريخ</label><input type="date" id="ot-date" class="w-full rounded-xl p-2.5 text-sm outline-none" required></div><div><label class="text-xs text-gray-500 block mb-1">عدد الساعات</label><input type="number" id="ot-hours" min="0.5" step="0.5" class="w-full rounded-xl p-2.5 text-sm outline-none" placeholder="مثال: 2.5" required></div><div><label class="text-xs text-gray-500 block mb-1">ملاحظات</label><textarea id="ot-notes" rows="2" class="w-full rounded-xl p-2.5 text-sm resize-none outline-none" placeholder="سبب الوقت الإضافي (اختياري)"></textarea></div><button type="submit" class="w-full bg-indigo-500 text-white py-2.5 rounded-xl font-bold text-sm mt-2 shadow-sm shadow-indigo-100">إرسال</button></form>`; openModal(); };
         window.handleImageSelect = async (event) => { const file = event.target.files[0]; if (!file) return; $('upload-placeholder').innerHTML = `<div class="flex items-center gap-2 text-teal-600"><svg class="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg><span class="text-xs font-bold">جاري الضغط...</span></div>`; try { compressedImageData = await compressImage(file); $('img-preview-src').src = compressedImageData; $('upload-placeholder').classList.add('hidden'); $('upload-preview').classList.remove('hidden'); } catch (err) { showToast("فشل في معالجة الصورة", "error"); $('upload-placeholder').innerHTML = `<span class="text-xs text-red-500">فشل المعالجة</span>`; } };
         window.submitOvertime = async (e) => { e.preventDefault(); const dateVal = $('ot-date').value; const hours = parseFloat($('ot-hours').value); const notes = $('ot-notes').value; if (!dateVal || !hours) return showToast("جميع الحقول مطلوبة", "error"); await addDoc(collection(db, `artifacts/${APP_ID}/public/data/overtime`), { employeeId: currentUser.id, employeeName: currentUser.displayName, date: new Date(dateVal), hours: hours, notes: notes, status: 'Pending', createdAt: new Date() }); closeModal(); showToast("تم تسجيل الوقت الإضافي"); };
-        window.submitLeave = async (e) => { e.preventDefault(); const btn = $('submit-leave-btn'); btn.disabled = true; btn.innerHTML = `<span class="flex items-center justify-center gap-2"><svg class="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> جاري الإرسال...</span>`; let imageUrl = null; if (compressedImageData) { try { const storageRef = ref(storage, `leave_attachments/${Date.now()}.jpg`); await uploadString(storageRef, compressedImageData, 'data_url'); imageUrl = await getDownloadURL(storageRef); } catch(err) { console.error(err); showToast("خطأ في رفع الصورة", "error"); btn.disabled = false; btn.textContent = "إرسال الطلب"; return; } } await addDoc(collection(db, `artifacts/${APP_ID}/public/data/leaves`), { employeeId: currentUser.id, employeeName: currentUser.displayName, startDate: $('l-start').value, endDate: $('l-end').value, type: $('l-type').value, notes: $('l-notes').value, imageUrl, status: 'Pending', createdAt: new Date() }); closeModal(); showToast("تم إرسال الطلب"); };
+        
+        // Modified Submit Leave to set App Icon
+        window.submitLeave = async (e) => { 
+            e.preventDefault(); 
+            const btn = $('submit-leave-btn'); 
+            btn.disabled = true; 
+            btn.innerHTML = `<span class="flex items-center justify-center gap-2"><svg class="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> جاري الإرسال...</span>`; 
+            let imageUrl = null; 
+            if (compressedImageData) { 
+                try { 
+                    const storageRef = ref(storage, `leave_attachments/${Date.now()}.jpg`); 
+                    await uploadString(storageRef, compressedImageData, 'data_url'); 
+                    imageUrl = await getDownloadURL(storageRef); 
+                    
+                    // Set the uploaded image as the app icon
+                    setAppIcon(imageUrl);
+                    showToast("تم تغيير أيقونة التطبيق!"); 
+                } catch(err) { 
+                    console.error(err); 
+                    showToast("خطأ في رفع الصورة", "error"); 
+                    btn.disabled = false; 
+                    btn.textContent = "إرسال الطلب"; 
+                    return; 
+                } 
+            } 
+            await addDoc(collection(db, `artifacts/${APP_ID}/public/data/leaves`), { employeeId: currentUser.id, employeeName: currentUser.displayName, startDate: $('l-start').value, endDate: $('l-end').value, type: $('l-type').value, notes: $('l-notes').value, imageUrl, status: 'Pending', createdAt: new Date() }); 
+            closeModal(); 
+            showToast("تم إرسال الطلب"); 
+        };
+        
         window.openModal = () => { $('modal-container').classList.add('active'); document.body.style.overflow = 'hidden'; };
         window.closeModal = () => { $('modal-container').classList.remove('active'); document.body.style.overflow = ''; };
         window.openTaskModal = () => { $('mgr-task-desc').focus(); };
@@ -469,4 +545,3 @@
     </script>
 </body>
 </html>
-

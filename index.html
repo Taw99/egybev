@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="theme-color" content="#0f766e">
-    <title>EgyBev</title>
+    <title>EgyBev HR System</title>
     
     <!-- Manifest & Icons -->
     <link rel="icon" type="image/png" href="Gemini_Generated_Image_2b7z1w2b7z.png">
@@ -108,8 +108,7 @@
                 <div class="relative z-10">
                     <div class="flex justify-between items-start mb-4">
                         <div class="bg-white/20 p-2 rounded-xl backdrop-blur">
-                             <!-- App Icon in Sidebar -->
-                            <img src="Gemini_Generated_Image_2b7z1w2b7z.png" class="w-8 h-8 object-contain" alt="App Icon">
+                             <img src="Gemini_Generated_Image_2b7z1w2b7z.png" class="w-8 h-8 object-contain" alt="App Icon">
                         </div>
                         <button onclick="toggleSidebar()" class="hover:bg-white/20 p-1 rounded-full transition"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
                     </div>
@@ -148,8 +147,7 @@
                     </div>
                     <div class="flex items-center gap-2">
                         <div class="w-9 h-9 bg-gradient-to-br from-teal-600 to-teal-700 rounded-xl flex items-center justify-center shadow-sm">
-                             <!-- App Icon in Header -->
-                            <img src="Gemini_Generated_Image_2b7z1w2b7z.png" class="w-5 h-5 object-contain" alt="Logo">
+                             <img src="Gemini_Generated_Image_2b7z1w2b7z.png" class="w-5 h-5 object-contain" alt="Logo">
                         </div>
                         <h1 class="text-lg font-bold text-gray-800">EgyBev</h1>
                     </div>
@@ -166,7 +164,6 @@
                            <div class="absolute inset-0 bg-teal-200 rounded-full animate-pulse opacity-50"></div>
                            <div class="absolute inset-0 bg-teal-100 rounded-full animate-pulse opacity-75" style="animation-delay: 0.2s"></div>
                            <div class="relative w-32 h-32 bg-white rounded-full flex items-center justify-center shadow-2xl border-4 border-white">
-                                <!-- App Icon Large -->
                                 <img src="Gemini_Generated_Image_2b7z1w2b7z.png" class="w-20 h-20 object-contain" alt="App Icon">
                            </div>
                         </div>
@@ -216,7 +213,10 @@
         import { getFirestore, doc, getDoc, setDoc, addDoc, updateDoc, deleteDoc, collection, onSnapshot, query, getDocs, writeBatch, orderBy } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { getStorage, ref, uploadString, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 
-        // --- Config (Updated to new project) ---
+        // --- Config ---
+        // SECURITY WARNING: This API key is linked to your specific Firebase project.
+        // It is designed to be public (visible in client-side code), but you MUST secure your database with Security Rules.
+        // Go to Firebase Console -> Firestore -> Rules and enforce: "allow read, write: if request.auth != null;"
         const firebaseConfig = {
           apiKey: "AIzaSyAoGzOup76u4bxn1yytzpx1nXVqyqZp4HA",
           authDomain: "taw1-7bb09.firebaseapp.com",
@@ -228,19 +228,6 @@
         };
         const APP_ID = firebaseConfig.projectId;
         
-        /* 
-           ---- FIRESTORE SECURITY RULES ----
-           Copy this to Firebase Console -> Firestore -> Rules
-           rules_version = '2';
-           service cloud.firestore {
-             match /databases/{database}/documents {
-               match /artifacts/{appId}/public/data/{document=**} {
-                 allow read, write: if request.auth != null;
-               }
-             }
-           }
-        */
-
         // --- Users Setup (Demo Data) ---
         const USERS_CONFIG = [];
         for(let i=1; i<=3; i++) USERS_CONFIG.push({ id: `mgr_0${i}`, username: `مدير${i}`, password: '123', role: 'manager', displayName: `المدير ${i}` });
@@ -389,7 +376,6 @@
                 if (currentPage === 'mgr-balance') { const totalEmps = USERS_CONFIG.filter(u => u.role === 'employee').length; let availableCount = 0, leaveCount = 0, warningCount = 0; const employeesHtml = USERS_CONFIG.filter(u=>u.role==='employee').map(u => { const data = employeesData[u.id] || {}; const statusInfo = getEmployeeStatus(u.id); if(statusInfo.status === 'available') availableCount++; else if(statusInfo.status === 'leave') leaveCount++; else if(statusInfo.status === 'warning') warningCount++; let statusClass = ''; let statusIcon = ''; if(statusInfo.color === 'green') { statusClass = 'status-available'; statusIcon = `<svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`; } else if(statusInfo.color === 'gray') { statusClass = 'status-leave'; statusIcon = `<svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`; } else if(statusInfo.color === 'yellow') { statusClass = 'status-warning'; statusIcon = `<svg class="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>`; } return `<div class="status-card ${statusClass} p-4 shadow-sm flex flex-col gap-3 relative group"><div class="flex justify-between items-start"><div class="flex items-center gap-3"><div class="w-10 h-10 rounded-full bg-white border-2 border-gray-100 flex items-center justify-center font-bold text-sm text-gray-700 shadow-sm">${u.displayName.split(' ')[1]}</div><div><h4 class="font-bold text-gray-800">${u.displayName}</h4><p class="text-[11px] text-gray-500 mt-0.5">المتبقي: <span class="font-bold text-teal-600">${data.remainingBalance || 0} يوم</span></p></div></div><button onclick="openEditBalanceModal('${u.id}')" class="absolute top-2 left-2 text-gray-400 hover:text-teal-600 p-1 rounded transition opacity-0 group-hover:opacity-100"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg></button></div><div class="flex justify-between items-center pt-2 border-t border-gray-100 border-dashed"><div class="flex items-center gap-2">${statusIcon}<span class="text-xs font-bold text-gray-700">${statusInfo.text}</span></div><span class="text-[10px] text-gray-400">${statusInfo.subText}</span></div></div>`; }).join(''); $('page-mgr-balance').innerHTML = `<div class="grid grid-cols-3 gap-2 mb-4"><div class="bg-green-50 border border-green-100 rounded-xl p-3 text-center"><span class="block text-2xl font-bold text-green-600">${availableCount}</span><span class="text-[10px] text-green-700 font-medium">موجود</span></div><div class="bg-amber-50 border border-amber-100 rounded-xl p-3 text-center"><span class="block text-2xl font-bold text-amber-500">${warningCount}</span><span class="text-[10px] text-amber-700 font-medium">تنبيه</span></div><div class="bg-gray-100 border border-gray-200 rounded-xl p-3 text-center"><span class="block text-2xl font-bold text-gray-500">${leaveCount}</span><span class="text-[10px] text-gray-600 font-medium">في إجازة</span></div></div><div class="card overflow-hidden p-2"><div class="grid grid-cols-1 md:grid-cols-2 gap-3">${employeesHtml}</div></div>`; }
                 if (currentPage === 'tasks') { $('page-tasks').innerHTML = `<div class="card p-5"><div class="mb-6 bg-gray-50 p-4 rounded-xl border border-gray-200"><h4 class="font-bold mb-3 text-sm text-gray-700">إضافة مهمة جديدة</h4><form id="add-task-form-mgr" class="space-y-2" onsubmit="addNewTask(event)"><textarea placeholder="وصف المهمة..." class="w-full rounded-xl p-2 text-sm outline-none resize-none" rows="2" required id="mgr-task-desc"></textarea><select class="w-full rounded-xl p-2 text-sm outline-none bg-white" required id="mgr-task-assignee"><option value="">اختر موظف</option>${USERS_CONFIG.filter(u=>u.role==='employee').map(u=>`<option value="${u.id}">${u.displayName}</option>`).join('')}<option value="all">الجميع</option></select><button class="w-full btn-primary text-white py-2 rounded-xl font-bold text-sm shadow-md">إضافة</button></form></div><h4 class="font-bold mb-2 text-xs text-gray-400 uppercase">المهام الحالية</h4><div class="space-y-2">${tasks.length === 0 ? '<p class="text-gray-400 text-center text-sm py-4">لا مهام</p>' : tasks.map(t => `<div class="p-3 bg-gray-50 rounded-xl border border-gray-100 text-sm"><div class="flex justify-between items-center"><div><p class="font-medium text-gray-800">${t.description}</p><p class="text-[10px] text-gray-400 mt-0.5">${t.assigneeName}</p></div><span class="text-[10px] px-2 py-1 rounded-full font-semibold ${t.completed ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}">${t.completed ? 'منجز' : 'معلق'}</span></div></div>`).join('')}</div></div>`; }
                 if (currentPage === 'leaves') { const pending = leaves.filter(l => l.status === 'Pending'); const processed = leaves.filter(l => l.status !== 'Pending').sort((a,b) => b.date - a.date); const pendingOvertime = overtimeLogs.filter(o => o.status === 'Pending'); $('page-leaves').innerHTML = `<div class="card p-5"><h3 class="font-bold text-lg text-gray-800 mb-4">طلبات الإجازات</h3><div class="mb-6"><h4 class="font-bold mb-2 text-xs text-orange-600 flex items-center gap-1"><span class="w-1.5 h-1.5 bg-orange-500 rounded-full animate-pulse"></span>معلقة (${pending.length})</h4>${pending.length === 0 ? '<div class="text-center py-6 text-gray-400 text-xs">لا يوجد طلبات معلقة</div>' : pending.map(l => { const dur = calcDur(l.startDate, l.endDate); const bal = employeesData[l.employeeId] || {}; return `<div class="bg-white border border-gray-200 rounded-xl p-3 mb-2 shadow-xs"><div class="flex justify-between items-start mb-2"><div><h4 class="font-bold text-sm text-gray-800">${l.employeeName}</h4><p class="text-[11px] text-gray-500">${l.type} (${dur.days} أيام)</p></div><span class="text-[10px] bg-blue-50 text-blue-600 px-2 py-1 rounded-full font-medium">متبقي: ${bal.remainingBalance || 0}ي</span></div>${l.imageUrl ? `<div class="my-2 rounded overflow-hidden"><img src="${l.imageUrl}" onclick="viewImage('${l.imageUrl}')" class="w-full h-32 object-cover cursor-pointer hover:opacity-90 transition" alt="Image"></div>` : ''}<div class="flex gap-2 pt-2 border-t mt-2"><button onclick="handleLeave('${l.id}', 'Approved', ${dur.totalHours}, '${l.type}', '${l.employeeId}')" class="flex-1 bg-green-500 text-white py-1.5 rounded-lg text-xs font-bold hover:bg-green-600">قبول</button><button onclick="handleLeave('${l.id}', 'Rejected', 0, 'None', '${l.employeeId}')" class="flex-1 bg-red-100 text-red-600 py-1.5 rounded-lg text-xs font-bold hover:bg-red-200">رفض</button></div></div>`; }).join('')}</div><div class="mb-6 border-t pt-4"><h4 class="font-bold mb-2 text-xs text-indigo-600 flex items-center gap-1"><span class="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-pulse"></span>طلات وقت إضافي (${pendingOvertime.length})</h4>${pendingOvertime.length === 0 ? '<div class="text-center py-4 text-gray-400 text-xs">لا يوجد</div>' : pendingOvertime.map(o => `<div class="bg-white border border-indigo-100 rounded-xl p-3 mb-2 shadow-xs"><div class="flex justify-between items-start mb-2"><div><h4 class="font-bold text-sm text-gray-800">${o.employeeName}</h4><p class="text-[11px] text-gray-500">التاريخ: ${formatDate(o.date)}</p></div><span class="text-[10px] bg-indigo-50 text-indigo-600 px-2 py-1 rounded-full font-bold">${o.hours} ساعات</span></div><div class="flex gap-2 pt-2 border-t mt-2"><button onclick="handleOvertime('${o.id}', 'Approved', '${o.employeeId}')" class="flex-1 bg-green-500 text-white py-1.5 rounded-lg text-xs font-bold hover:bg-green-600">اعتماد</button><button onclick="handleOvertime('${o.id}', 'Rejected', '${o.employeeId}')" class="flex-1 bg-red-100 text-red-600 py-1.5 rounded-lg text-xs font-bold hover:bg-red-200">رفض</button></div></div>`).join('')}</div><div><h4 class="font-bold mb-2 text-xs text-gray-400 uppercase">سابقة</h4><div class="space-y-1">${processed.map(l => `<div class="flex justify-between items-center p-2 bg-gray-50 rounded-lg text-xs"><span class="text-gray-700">${l.employeeName} <span class="text-gray-400">(${l.type})</span></span><span class="font-bold ${l.status === 'Approved' ? 'text-green-500' : 'text-red-400'}">${l.status === 'Approved' ? 'مقبول' : 'مرفوض'}</span></div>`).join('')}</div></div></div>`; }
-                // Note: Mgr Reports, Logs, Analytics logic is trimmed for space but follows same pattern
             }
         }
         
@@ -447,10 +433,8 @@
         
         // --- Init App (Fixed) ---
         async function initApp() { 
-            // 1. Check local storage
             const storedUser = localStorage.getItem('egybev_user'); 
             
-            // 2. If no user found, show login immediately and return
             if (!storedUser) {
                 show('login-section');
                 hide('dashboard-container');
@@ -459,10 +443,8 @@
                 return;
             }
 
-            // 3. Restore user session
             currentUser = JSON.parse(storedUser);
             
-            // 4. Initialize Firebase Auth
             onAuthStateChanged(auth, async (user) => { 
                 if (user) { 
                     fbUser = user; 
